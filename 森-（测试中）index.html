@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>S-Phone</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --phone-width: 380px; /* [更新] 手机整体改小 */
+            --phone-height: 820px;
+            --primary-text: #000;
+            --secondary-text: #8e8e93;
+            --light-gray-text: #B0B0B0; /* [新增] 浅灰色字体 */
+            --deep-gray-text: #6c6c6c; /* [新增] 深灰色字体 */
+            --qq-blue: #007AFF;
+            --battery-green: #34c759;
+            --battery-red: #ff3b30;
+            --qq-bg: #f0f2f5;
+            --qq-nav-bg: #f8f8f8;
+            --qq-border-color: #dcdcdc;
+        }
+
+        /* --- 基础框架 --- */
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", Arial, sans-serif; margin: 0; overflow: hidden; }
+        #phone-container { width: var(--phone-width); height: var(--phone-height); background: #1c1c1e; border-radius: 54px; box-shadow: 0 25px 70px rgba(0,0,0,0.5), inset 0 0 15px rgba(255,255,255,0.05); display: flex; flex-direction: column; overflow: hidden; position: relative; border: 12px solid #000; transition: all 0.3s ease; }
+        #phone-container.fullscreen { border: none; border-radius: 0; width: 100vw; height: 100vh; }
+        .screen { width: 100%; height: 100%; display: flex; flex-direction: column; position: relative; background-color: #000; border-radius: 42px; overflow:hidden; }
+        #phone-container.fullscreen .screen { border-radius: 0; }
+
+        /* --- 主屏幕 --- */
+        .home-screen { position: absolute; inset: 0; background-size: cover; background-position: center; display: flex; flex-direction: column; }
+        .home-screen-content { flex: 1; display: flex; flex-direction: column; align-items: center; padding-top: 80px; }
+        .app-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; width: 100%; padding: 0 22px; margin-top: 40px; }
+        .app-icon-wrapper { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+        .app-icon-image { width: 60px; height: 60px; border-radius: 14px; overflow: hidden; margin-bottom: 8px; box-shadow: 0 5px 10px rgba(0,0,0,0.2); }
+        .app-icon-image img { width: 100%; height: 100%; object-fit: cover; }
+        .app-icon-name { font-size: 12px; color: white; text-shadow: 0 1px 3px rgba(0,0,0,0.7); }
+
+        /* --- 状态栏 & 灵动岛 --- */
+        .status-bar { height: 44px; display: flex; justify-content: space-between; align-items: center; padding: 0 6px; color: white; font-size: 15px; position: absolute; top: 0; left: 0; right: 0; z-index: 1100; text-shadow: 0 1px 2px rgba(0,0,0,0.6); pointer-events: none; }
+        .status-bar-left, .status-bar-right { display: flex; align-items: center; padding: 0 14px; height: 100%; pointer-events: auto; cursor: pointer; }
+        .status-bar-left { gap: 6px; } .status-bar-right { gap: 8px; }
+        .time { font-weight: 600; }
+        .battery-icon { width: 28px; height: 15px; border: 1.8px solid white; border-radius: 4.5px; position: relative; padding: 1.5px; box-sizing: border-box; transform: scale(1.1); } /* [更新] 电池图标改動 */
+        .battery-icon::after { content: ''; position: absolute; right: -4.5px; top: 50%; transform: translateY(-50%); width: 2px; height: 5.5px; background-color: white; border-radius: 0 1.5px 1.5px 0; }
+        .battery-level { position: absolute; top: 1.5px; left: 1.5px; bottom: 1.5px; background-color: white; border-radius: 2.5px; transition: width 0.5s ease, background-color 0.5s ease; }
+        .charging .battery-level { background-color: var(--battery-green); } .low-battery .battery-level { background-color: var(--battery-red); }
+        .dynamic-island { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 125px; height: 36px; background-color: black; border-radius: 20px; display: flex; justify-content: center; align-items: center; color: white; font-size: 14px; cursor: pointer; transition: all 0.5s cubic-bezier(0.32, 0.94, 0.6, 1); z-index: 1099; }
+        .dynamic-island > div { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }
+        .dynamic-island .island-default-content { opacity: 1; font-weight: 500; }
+        .dynamic-island.notification { width: 95%; height: 85px; border-radius: 40px; }
+        .dynamic-island.notification .island-notification-content { opacity: 1; }
+        .island-notification-content { display: flex; align-items: center; justify-content: flex-start; padding: 0 20px; gap: 15px; width: 100%; }
+        .island-notification-content .app-icon { width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0; }
+        .island-notification-content .text-content { display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; }
+        .island-notification-content .text-content .app-name { font-weight: bold; font-size: 16px; }
+        .island-notification-content .text-content .message { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+        .notification-center-overlay { position: absolute; inset: 0; background-color: rgba(0,0,0,0.3); backdrop-filter: blur(20px); z-index: 1500; display: none; }
+        .notification-center-overlay.active { display: block; }
+        .notification-list { padding: 60px 15px; display: flex; flex-direction: column; gap: 10px; }
+        .notification-item { background-color: rgba(255,255,255,0.8); border-radius: 15px; padding: 12px; display: flex; flex-direction: column; gap: 5px; }
+        .notification-header { display: flex; align-items: center; gap: 8px; }
+        .notification-app-icon { width: 20px; height: 20px; border-radius: 5px; }
+        .notification-app-name { font-size: 14px; font-weight: 600; }
+        .notification-content { font-size: 15px; }
+
+        /* --- 应用通用 --- */
+        .app-container, .app-page { position: absolute; inset: 0; background-color: var(--qq-bg); display: none; flex-direction: column; z-index: 1000; transform: translateX(100%); transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1); }
+        .app-container.active, .app-page.active { display: flex; transform: translateX(0); }
+        .app-navigation-bar { position: absolute; top: 0; left: 0; right: 0; height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; flex-shrink: 0; z-index: 10; background: rgba(248, 248, 248, 0.85); backdrop-filter: blur(20px); border-bottom: 0.5px solid var(--qq-border-color); margin-top: 44px; } /* [更新] 整体下移, 避免遮挡 */
+        #phone-container.fullscreen .app-navigation-bar { margin-top: 0; }
+        .app-back-btn { font-size: 22px; cursor: pointer; color: var(--qq-blue); padding: 5px 10px; display: flex; align-items: center; gap: 4px; }
+        .app-back-btn .back-text { font-size: 17px; }
+        .app-title { font-size: 17px; font-weight: 600; position: absolute; left: 50%; transform: translateX(-50%); }
+        .app-header-icon { width: 28px; height: 28px; background-size: contain; background-repeat: no-repeat; background-position: center; cursor: pointer; }
+        .app-content { flex: 1; overflow-y: auto; background-color: var(--qq-bg); padding-top: 88px; padding-bottom: 84px; } /* [更新] 调整内边距 */
+        #phone-container.fullscreen .app-content { padding-top: 44px; }
+        .bottom-nav { display: flex; border-top: 0.5px solid var(--qq-border-color); background-color: rgba(248, 248, 248, 0.85); backdrop-filter: blur(20px); position: absolute; bottom: 0; left: 0; right: 0; padding-bottom: 34px; } /* [更新] 调整导航栏位置 */
+        .nav-item { flex: 1; text-align: center; padding: 6px 0 0; cursor: pointer; color: #8e8e93; }
+        .nav-item.active { color: var(--qq-blue); }
+        .nav-item i { font-size: 22px; display: block; margin-bottom: 2px; }
+        .nav-item span { font-size: 10px; }
+        .app-page-content { display: none; }
+        .app-page-content.active { display: block; height: 100%; }
+        .home-indicator { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 135px; height: 5px; background-color: rgba(0,0,0,0.4); border-radius: 3px; cursor: pointer; z-index: 1101; }
+        #phone-container.fullscreen .home-indicator { background-color: rgba(255,255,255,0.6); }
+        .menu-item { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 17px; border-bottom: 0.5px solid var(--qq-bg); background-color: white; }
+        .menu-item:last-child { border-bottom: none; }
+        .menu-item:hover { background-color: #f0f0f0; }
+        .menu-item .menu-item-right { display: flex; align-items: center; gap: 8px; color: #8e8e93; font-size: 17px; }
+        .menu-item .menu-item-right::after { content: '›'; color: #c7c7cc; margin-left: 6px; font-size: 22px; font-weight: 300; }
+        .menu-icon { font-size: 20px; margin-right: 16px; width: 24px; text-align: center; color: var(--qq-blue); }
+        .profile-avatar { width: 50px; height: 50px; border-radius: 50%; object-fit: cover; cursor: pointer; }
+        .form-group { padding: 12px 16px; background-color: white; }
+        .form-group label { display: block; margin-bottom: 8px; font-size: 14px; color: #555; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; box-sizing: border-box; font-family: inherit; }
+        .form-group textarea { min-height: 150px; resize: vertical; }
+        .form-actions { display: flex; gap: 10px; margin-top: 15px; padding: 0 15px; }
+        .form-btn { flex: 1; padding: 14px; border: none; border-radius: 10px; font-size: 17px; font-weight: 500; cursor: pointer; }
+        .form-btn-primary { background-color: var(--qq-blue); color: white; }
+        .form-btn-secondary { background-color: #e5e5ea; color: #000; }
+        .file-input { display: none; }
+        .status-message { margin: 15px; padding: 10px; border-radius: 8px; text-align: center; }
+        .status-message.success { background-color: #d4edda; color: #155724; }
+        .status-message.error { background-color: #f8d7da; color: #721c24; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; justify-content: center; align-items: center; z-index: 3000; backdrop-filter: blur(5px); }
+        .modal-content { background: #f8f8f8; padding: 20px; border-radius: 14px; width: 85%; max-height: 90%; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .context-menu { position: absolute; background: rgba(255,255,255,0.9); backdrop-filter: blur(15px); border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); z-index: 4000; display: none; overflow: hidden; }
+        .context-menu-item { padding: 12px 18px; cursor: pointer; font-size: 16px; border-bottom: 0.5px solid rgba(0,0,0,0.1); }
+        .context-menu-item:last-child { border-bottom: none; }
+        .context-menu-item:hover { background-color: rgba(0,0,0,0.05); }
+
+        /* --- 聊天APP (QQ风格) --- */
+        .chat-list-item { display: flex; align-items: center; padding: 10px 16px; gap: 12px; border-bottom: 0.5px solid var(--qq-bg); background: white; cursor: pointer; }
+        .chat-list-item .avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; }
+        .chat-list-item .details { flex: 1; overflow: hidden; }
+        .chat-list-item .details .name { font-weight: 500; font-size: 17px; }
+        .chat-list-item .details .last-message { font-size: 14px; color: var(--secondary-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .chat-list-item .info { text-align: right; font-size: 12px; color: var(--secondary-text); }
+        .contact-group-header { padding: 5px 16px; font-size: 14px; color: var(--secondary-text); background: var(--qq-bg); }
+        .conversation-page { display: flex; flex-direction: column; height: 100%; background-color: var(--qq-bg); background-size: cover; background-position: center; }
+        .conversation-header { display: flex; justify-content: space-between; align-items: center; padding: 0 10px; height: 44px; background: rgba(248, 248, 248, 0.85); backdrop-filter: blur(20px); border-bottom: 0.5px solid var(--qq-border-color); position: fixed; top: 44px; left: 0; right: 0; z-index: 1001; }
+        #phone-container.fullscreen .conversation-header { top: 0; }
+        .conversation-header .title-container { text-align: center; flex: 1; margin: 0 40px; overflow: hidden; }
+        .conversation-header .title { font-size: 17px; font-weight: 600; display: block; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+        .conversation-header .remark { font-size: 12px; color: var(--deep-gray-text); display: block; } /* [更新] 备注字体颜色 */
+        .conversation-header .settings-btn { background-image: url('https://tc.z.wiki/autoupload/f/_dUEGnKEJQzmc-cKlsXN5NiO_OyvX7mIgxFBfDMDErs/20251021/KpZf/1079X1083/Image_1760785735649.png'); }
+        .message-area { flex: 1; overflow-y: auto; padding: 10px; padding-top: 54px; padding-bottom: 84px; } /* [更新] 聊天内容下移 */
+        .message-bubble { display: flex; margin-bottom: 15px; max-width: 85%; align-items: flex-start; }
+        .message-bubble .avatar { width: 40px; height: 40px; border-radius: 50%; cursor: pointer; flex-shrink: 0; }
+        .message-bubble .content-wrapper { display: flex; flex-direction: column; max-width: calc(100% - 50px); }
+        .message-bubble .content { max-width: 100%; word-wrap: break-word; font-size: 17px; line-height: 1.4; padding: 10px 14px; }
+        .message-bubble.sent { margin-left: auto; flex-direction: row-reverse; }
+        .message-bubble.sent .avatar { margin-left: 10px; }
+        .message-bubble.received { margin-right: auto; }
+        .message-bubble.received .avatar { margin-right: 10px; }
+        .chat-input-bar { display: flex; align-items: flex-end; padding: 8px 10px; gap: 8px; background: var(--qq-nav-bg); border-top: 0.5px solid var(--qq-border-color); position: fixed; bottom: 0; left: 0; right: 0; z-index: 1001; padding-bottom: 34px; }
+        .chat-input-bar .icon-btn { width: 28px; height: 28px; background-size: contain; background-repeat: no-repeat; background-position: center; cursor: pointer; flex-shrink: 0; margin-bottom: 4px; }
+        .chat-input-bar .input-container { flex: 1; display: flex; flex-direction: column; background: white; border-radius: 18px; border: 0.5px solid #ddd; }
+        .chat-input-bar textarea { width: 100%; padding: 8px 14px; border: none; background: transparent; font-size: 17px; resize: none; max-height: 100px; box-sizing: border-box; }
+        .chat-input-bar .send-btn { background: var(--qq-blue); color: white; border: none; border-radius: 8px; padding: 6px 12px; font-size: 16px; cursor: pointer; align-self: flex-end; margin-bottom: 4px; display: none; } /* [更新] 发送按钮改小，默认隐藏 */
+        .chat-plus-menu { position: absolute; bottom: 84px; left: 0; right: 0; background: #f7f7f7; display: none; grid-template-columns: repeat(4, 1fr); padding: 20px; gap: 20px; z-index: 1002; border-top: 0.5px solid var(--qq-border-color); }
+        .chat-plus-menu-item { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12px; color: #555; cursor: pointer; }
+        .chat-plus-menu-item .icon { width: 56px; height: 56px; background: white; border-radius: 12px; display: flex; justify-content: center; align-items: center; font-size: 28px; color: #555; border: 0.5px solid #eee; }
+        .chat-profile-header { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px; background: white; border-radius: 10px; margin-bottom: 10px; }
+        .chat-profile-header .avatar { width: 80px; height: 80px; }
+        .chat-profile-header .name { font-size: 22px; font-weight: bold; }
+        .chat-profile-header .signature { font-size: 14px; color: var(--secondary-text); }
+        .system-message-bubble { text-align:center; margin: 10px 0; }
+        .system-message-bubble span { background-color:rgba(229,229,234,0.7); color:rgb(51,51,51); font-size:12px; padding:3px 8px; border-radius:8px; display:inline-block; }
+        .quote-preview { background: #e9e9e9; padding: 5px 10px; border-radius: 5px; margin: 5px 5px 0; font-size: 14px; color: #555; border-left: 3px solid var(--qq-blue); position: relative; }
+        .quote-preview .close-quote { position: absolute; top: 2px; right: 5px; cursor: pointer; font-weight: bold; color: #999; }
+
+        /* --- 动态(Moments)页面样式 --- */
+        .moments-header-bg { height: 180px; background: linear-gradient(to bottom, #555, #333); position: relative; }
+        .moments-publish-btn { position: absolute; top: 10px; right: 10px; color: white; font-size: 24px; cursor: pointer; }
+        .moments-feed { background: white; }
+        .moment-item { padding: 16px; border-bottom: 1px solid #f0f0f0; }
+        .moment-header { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+        .moment-avatar { width: 45px; height: 45px; border-radius: 50%; }
+        .moment-author { font-weight: 600; color: var(--qq-blue); }
+        .moment-content { margin-bottom: 10px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+        .moment-media { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 10px; }
+        .moment-media img, .moment-media video { width: 100%; height: 100px; object-fit: cover; border-radius: 5px; }
+        .moment-footer { display: flex; justify-content: space-between; align-items: center; color: var(--secondary-text); font-size: 12px; }
+        .moment-actions { display: flex; gap: 15px; }
+        .moment-actions span { cursor: pointer; }
+        .moment-comments-section { background: #f7f7f7; padding: 8px; margin-top: 10px; border-radius: 5px; }
+        .moment-comment { font-size: 14px; margin-bottom: 4px; }
+        .moment-comment .comment-author { font-weight: 600; color: var(--qq-blue); }
+
+        /* --- 外卖/豆瓣等集成APP样式 --- */
+        .delivery-search-bar { padding: 10px 16px; background: white; border-bottom: 0.5px solid var(--qq-bg); }
+        .delivery-search-bar input { width: 100%; padding: 10px 16px; border-radius: 20px; border: none; background: var(--qq-bg); font-size: 16px; }
+        .food-list { padding: 16px; display: grid; grid-template-columns: 1fr; gap: 16px; }
+        .food-item { display: flex; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .food-item img { width: 100px; height: 100px; object-fit: cover; }
+        .food-item .info { flex: 1; padding: 10px; display: flex; flex-direction: column; }
+        .food-item .name { font-weight: 600; }
+        .food-item .price { color: var(--battery-red); font-size: 18px; margin-top: auto; }
+        .food-item .add-btn { align-self: flex-end; background: var(--qq-blue); color: white; border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 20px; cursor: pointer; }
+        .order-list { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+        .order-item { background: white; border-radius: 10px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .order-item .header { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 10px; }
+        .order-item .body { border-top: 1px solid #eee; border-bottom: 1px solid #eee; padding: 10px 0; margin: 10px 0; }
+        .order-item .footer { text-align: right; }
+        .order-item .actions { margin-top: 10px; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+        .rating-stars { cursor: pointer; } .rating-stars .fa-star { color: #ccc; } .rating-stars .fa-star.selected { color: #ffc107; }
+        .post-card { background-color: white; padding: 16px; border-bottom: 8px solid var(--qq-bg); cursor: pointer; }
+        .post-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .post-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+        .post-author { font-weight: bold; }
+        .post-content { margin-bottom: 10px; font-size: 16px; line-height: 1.5; white-space: pre-wrap; }
+        .post-actions { display: flex; justify-content: space-around; color: #888; border-top: 1px solid #f0f0f0; padding-top: 10px; }
+        .post-actions span { cursor: pointer; } .post-actions span i { margin-right: 5px; }
+        .comment-item { padding: 10px 0; border-bottom: 1px solid #f0f0f0; } .comment-item:last-child { border-bottom: none; }
+        .comment-header { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+        .comment-avatar { width: 24px; height: 24px; border-radius: 50%; }
+        .comment-author { font-size: 14px; font-weight: bold; }
+        .comment-time { font-size: 12px; color: #aaa; margin-left: auto; }
+        .comment-content { font-size: 15px; }
+        .comment-input-area { display: flex; gap: 10px; padding: 10px; background: #f8f8f8; border-top: 0.5px solid #ddd; }
+        .comment-input-area input { flex: 1; padding: 8px 12px; border-radius: 18px; border: 0.5px solid #ddd; }
+        .world-book-binder { display: flex; gap: 8px; }
+        .world-book-binder select { flex: 1; }
+        .world-book-binder button { padding: 0 15px; background-color: var(--qq-blue); color: white; border: none; border-radius: 8px; font-size: 20px; cursor: pointer; }
+        #bound-world-books-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .world-book-tag { background-color: #e0e0e0; color: #333; padding: 5px 10px; border-radius: 15px; font-size: 14px; display: flex; align-items: center; gap: 5px; }
+        .world-book-tag .remove-tag { cursor: pointer; font-weight: bold; }
+        .settings-item, .menu-item { color: var(--primary-text); }
+        .settings-item span, .menu-item span { color: inherit; }
+        .settings-menu .settings-item { background-color: white; border-bottom: 0.5px solid var(--qq-bg); }
+        .settings-menu .settings-item:first-child { border-top-left-radius: 10px; border-top-right-radius: 10px; }
+        .settings-menu .settings-item:last-child { border-bottom: none; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
+        .api-form .form-group, .slider-group { background-color: white; padding: 12px 16px; border-bottom: 0.5px solid var(--qq-bg); }
+        .api-form .form-group:first-child { border-top-left-radius: 10px; border-top-right-radius: 10px; }
+        .api-form .slider-group:last-of-type { border-bottom: none; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
+        .api-form .model-group { display: flex; justify-content: space-between; align-items: center; }
+        .fetch-button { background-color: var(--qq-blue); color: white; border: none; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+        .slider-container { display: flex; align-items: center; gap: 10px; }
+        .slider-container input[type=range] { flex: 1; }
+        
+        /* --- 注入的用户自定义CSS --- */
+        #user-styles-injection { display: none; }
+
+        /* --- [新增] 立体黑色气泡样式 --- */
+        .message-bubble.sent .content,
+        .message-bubble.received .content {
+            background-color: #000000;
+            color: #FFFFFF;
+            padding: 4px 6px; /* 统一气泡内部间距 */
+            margin: 4px 0; /* 气泡垂直间距 */
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            border: none; /* 确保无边框 */
+            box-shadow: 
+                0px 4px 8px rgba(0, 0, 0, 0.5),
+                inset 0px 1px 1px rgba(255, 255, 255, 0.1),
+                inset 0px -1px 1px rgba(0, 0, 0, 0.3);
+            text-shadow: 0 0 3px rgba(255, 255, 255, 0.2);
+            animation: none;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        .message-bubble.received .content { border-radius: 16px 16px 16px 6px; }
+        .message-bubble.sent .content { border-radius: 16px 16px 6px 16px; }
+
+        /* --- [新增] 红包/转账气泡样式 --- */
+        .transfer-bubble, .redpacket-bubble {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 15px;
+            border-radius: 8px;
+            width: 220px;
+            cursor: pointer;
+            background: #fa9d3b;
+            color: white;
+        }
+        .transfer-bubble { background: #fa9d3b; }
+        .redpacket-bubble { background: #ee503c; }
+        .transfer-bubble .icon, .redpacket-bubble .icon { font-size: 24px; }
+        .transfer-bubble .details, .redpacket-bubble .details { display: flex; flex-direction: column; }
+        .transfer-bubble .amount, .redpacket-bubble .amount { font-size: 16px; font-weight: bold; color: var(--light-gray-text); }
+        .transfer-bubble .remark, .redpacket-bubble .remark { font-size: 12px; color: var(--light-gray-text); }
+    </style>
+</head>
+<body>
+    <div id="phone-container">
+        <div class="screen">
+            <div class="home-screen" id="home-screen">
+                <div class="home-screen-content">
+                    <div class="app-grid" id="app-grid"></div>
+                </div>
+            </div>
+            <div class="status-bar">
+                <div class="status-bar-left"></div>
+                <div class="status-bar-right">
+                    <div class="network-type">5G</div>
+                    <div class="battery-container"><div class="battery-icon"><div class="battery-level"></div></div></div>
+                </div>
+            </div>
+            <div class="dynamic-island" id="dynamic-island">
+                <div class="island-default-content"></div>
+                <div class="island-notification-content">
+                    <img class="app-icon" id="island-noti-icon" src="">
+                    <div class="text-content">
+                        <div class="app-name" id="island-noti-app-name"></div>
+                        <div class="message" id="island-noti-text"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="notification-center-overlay" id="notificationCenterOverlay" onclick="hideNotificationCenter()"><div class="notification-list" id="notificationList"></div></div>
+            <div class="home-indicator" onclick="returnToHome()"></div>
+            
+            <!-- 应用容器 -->
+            <div class="app-container" id="chatContainer"></div>
+            <div class="app-container" id="settingsContainer"></div>
+            <div class="app-container" id="memoContainer"></div>
+
+            <!-- 子页面容器 -->
+            <div class="app-page" id="apiSettingsPage"></div>
+            <div class="app-page" id="dataManagementPage"></div>
+            <div class="app-page" id="screenModePage"></div>
+            <div class="app-page" id="chatModePage"></div>
+            <div class="app-page" id="backgroundChatPage"></div>
+            <div class="app-page" id="blacklistPage"></div>
+            <div class="app-page" id="beautifySettingsPage"></div>
+            <div class="app-page" id="worldbookMenuPage"></div>
+            <div class="app-page" id="conversationPage"></div>
+            <div class="app-page" id="characterCreatorPage"></div>
+            <div class="app-page" id="chatProfilePage"></div>
+            <div class="app-page" id="balanceDetailPage"></div>
+            <div class="app-page" id="worldbookEditPage"></div>
+            <div class="app-page" id="pokeSettingsPage"></div>
+            <div class="app-page" id="momentEditorPage"></div>
+
+            <!-- 模态框与上下文菜单 -->
+            <div class="modal" id="genericModal"><div class="modal-content" id="genericModalContent"></div></div>
+            <div class="context-menu" id="mainContextMenu"></div>
+            <div class="context-menu" id="messageContextMenu"></div>
+        </div>
+    </div>
+    
+    <style id="user-styles-injection"></style>
+
+    <script>
+        // --- 全局状态与数据管理 ---
+        let systemData;
+        const defaultSystemData = {
+            version: 'S-Phone-Omega-v4',
+            settings: { 
+                apiProvider: 'openai', apiKey: '', apiUrl: '', selectedModel: null, temperature: 0.7, top_p: 0.9,
+                chatMode: 'offline', // online, offline
+                backgroundChat: { enabled: false, interval: 360 },
+                fullscreen: false,
+                blacklist: []
+            },
+            beautify: {
+                desktopWallpaper: 'https://img.xjh.me/random_img.php?return=302',
+                chatWallpaper: '',
+                appIcons: {
+                    chat: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/51/IMessage_logo.svg/2048px-IMessage_logo.svg.png',
+                    settings: 'https://img.heliar.top/file/1761641197219_Image_1761641166362.png',
+                    memo: 'https://img.heliar.top/file/1761641197490_Image_1761641163726.png'
+                },
+                chatBubbleCss: ``,
+                avatarFrame: '',
+                fontUrl: '',
+                bubbleCssSlots: Array(10).fill({name: '', css: ''}),
+                redPacketIcon: '',
+                transferIcon: '',
+            },
+            chat: {
+                me: { 
+                    id: 'user_me', 
+                    name: 'User', 
+                    avatar: 'https://img.heliar.top/file/1762313790719_Image_1762058552404.jpg', 
+                    signature: '编辑个性签名', 
+                    persona: '',
+                    balance: 1000000,
+                    transactions: [],
+                    autoReply: '你好，我现在有事，稍后回复。'
+                },
+                contacts: [],
+                groups: [],
+                moments: [],
+                currentChatId: null
+            },
+            worldbooks: { 
+                presets: [],
+                styles: [],
+                library: []
+            },
+            douban: { 
+                profile: { name: 'User', avatar: 'https://img.heliar.top/file/1762313790719_Image_1762058552404.jpg' }, 
+                posts: [],
+                settings: { linkedCharIds: [] }
+            },
+            delivery: { 
+                profile: { name: 'User', avatar: 'https://img.heliar.top/file/1762313790719_Image_1762058552404.jpg', addresses: [{id: 1, recipient: '家', phone: '188****8888', address: 'XX市XX区XX街道XX别墅'}] }, 
+                orders: [], cachedItems: [], cart: []
+            },
+            notifications: []
+        };
+
+        function saveSystemData() { try { localStorage.setItem('sPhoneSystemData_v4', JSON.stringify(systemData)); } catch (e) { console.error("无法保存数据:", e); } }
+        function loadSystemData() { try { const saved = localStorage.getItem('sPhoneSystemData_v4'); if (saved) { const parsedData = JSON.parse(saved); if (parsedData.version === 'S-Phone-Omega-v4') { systemData = parsedData; } else { systemData = JSON.parse(JSON.stringify(defaultSystemData)); } } else { systemData = JSON.parse(JSON.stringify(defaultSystemData)); } } catch (e) { systemData = JSON.parse(JSON.stringify(defaultSystemData)); } }
+
+        // --- UI & 系统核心 ---
+        function updateTime() { const now = new Date(); const timeString = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }); document.querySelector('.dynamic-island .island-default-content').textContent = timeString; document.querySelector('.status-bar-left').textContent = timeString; }
+        async function updateBattery() { try { const b = await navigator.getBattery(); const l = Math.floor(b.level * 100); document.querySelector('.battery-level').style.width = `${l}%`; const cont = document.querySelector('.battery-container'); cont.classList.toggle('charging', b.charging); cont.classList.toggle('low-battery', !b.charging && l <= 20); } catch (e) { document.querySelector('.battery-level').style.width = `100%`; } }
+        function showNotificationCenter() { renderNotifications(); document.getElementById('notificationCenterOverlay').classList.add('active'); }
+        function hideNotificationCenter() { document.getElementById('notificationCenterOverlay').classList.remove('active'); }
+        function triggerNotification(app, text) { if (!app || !text) return; const newNoti = { id: Date.now(), app: app.name, text: text, icon: app.icon }; if(!systemData.notifications) systemData.notifications = []; systemData.notifications.unshift(newNoti); saveSystemData(); renderNotifications(); const island = document.getElementById('dynamic-island'); island.classList.add('notification'); document.getElementById('island-noti-icon').src = newNoti.icon; document.getElementById('island-noti-app-name').textContent = newNoti.app; document.getElementById('island-noti-text').textContent = newNoti.text; setTimeout(() => island.classList.remove('notification'), 4000); }
+        function renderNotifications() { const listEl = document.getElementById('notificationList'); if(!systemData.notifications) systemData.notifications = []; listEl.innerHTML = systemData.notifications.length === 0 ? '<div class="notification-item" style="text-align:center;">无新通知</div>' : systemData.notifications.map(n => `<div class="notification-item"><div class="notification-header"><img src="${n.icon}" class="notification-app-icon"><span class="notification-app-name">${n.app}</span></div><div class="notification-content">${n.text}</div></div>`).join(''); }
+        function showModal(id, content) { const modal = document.getElementById(id); modal.querySelector('.modal-content').innerHTML = content; modal.style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        // --- 应用导航 ---
+        function openApp(appId) { document.getElementById(appId + 'Container').classList.add('active'); }
+        function closeApp(appId) { document.getElementById(appId + 'Container').classList.remove('active'); }
+        function openAppPage(pageId) { document.getElementById(pageId).classList.add('active'); }
+        function closeAppPage(pageId) { document.getElementById(pageId).classList.remove('active'); }
+        function returnToHome() { document.querySelectorAll('.app-container.active, .app-page.active').forEach(el => el.classList.remove('active')); }
+
+        // --- API 功能 ---
+        async function callAI(prompt, char) { 
+            const { selectedModel, apiKey, apiUrl, temperature, top_p } = systemData.settings;
+            if (!selectedModel || !apiKey || !apiUrl) { throw new Error("API未配置或未选择模型"); } 
+            const preset = systemData.worldbooks.presets.map(p => p.content).join('\n') || ''; 
+            const style = systemData.worldbooks.styles.map(s => s.content).join('\n') || '';
+            const worldbooks = char?.worldbookIds?.map(id => systemData.worldbooks.library.find(w => w.id === id)?.content).filter(Boolean).join('\n') || '';
+            const finalPrompt = `${preset}\n${style}\n${worldbooks}\n\n${prompt}`;
+            
+            let finalApiUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+            if (systemData.settings.apiProvider === 'openai' && !finalApiUrl.endsWith('/v1')) finalApiUrl += '/v1';
+
+            const response = await fetch(`${finalApiUrl}/chat/completions`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, 
+                body: JSON.stringify({ model: selectedModel.id, messages: [{ role: 'user', content: finalPrompt }], temperature, top_p, max_tokens: 4096 }) 
+            }); 
+            if (!response.ok) { const err = await response.text(); throw new Error(`AI调用失败: ${err}`); } 
+            const data = await response.json(); 
+            let content = data.choices[0].message.content; 
+            if (Math.random() < 0.1 && char?.id) { setTimeout(() => retractMessage(char.id, -1, 'char'), Math.random() * 120000); } 
+            return content; 
+        }
+        
+        // --- 文件处理 ---
+        function handleFileUpload(file, callback) { if (!file) return; const reader = new FileReader(); reader.onload = e => callback(e.target.result); reader.readAsDataURL(file); }
+
+        // --- 通用渲染函数 ---
+        function renderAppWithPages(appId, navContent, pageContents) { const container = document.getElementById(appId + 'Container'); let pagesHtml = ''; for (const pageId in pageContents) { pagesHtml += `<div class="app-page-content" id="${appId}-${pageId}-page">${pageContents[pageId]}</div>`; } container.innerHTML = `<div class="app-content" style="padding:0; display:flex; flex-direction:column;"><div style="flex:1; overflow-y:auto; position:relative;">${pagesHtml}</div><div class="bottom-nav">${navContent}</div></div>`; container.querySelector('.app-page-content').classList.add('active'); container.querySelector('.nav-item').classList.add('active'); }
+        function switchAppPage(appId, pageId) { const container = document.getElementById(appId + 'Container'); container.querySelectorAll('.app-page-content, .nav-item').forEach(el => el.classList.remove('active')); document.getElementById(`${appId}-${pageId}-page`).classList.add('active'); container.querySelector(`.nav-item[onclick*="'${pageId}'"]`).classList.add('active'); }
+
+        // --- 设置APP ---
+        function renderSettingsApp() { const container = document.getElementById('settingsContainer'); container.innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeApp('settings')"><i class="fas fa-chevron-left"></i> <span class="back-text">主屏幕</span></div><div class="app-title">设置</div></div><div class="app-content"><div style="margin-top: 20px; border-radius: 10px; margin: 20px 16px 0; overflow:hidden;"><div class="menu-item" onclick="openAppPage('apiSettingsPage')"><span><i class="menu-icon fas fa-robot" style="color:var(--qq-blue);"></i>API与模型设置</span><div class="menu-item-right"></div></div><div class="menu-item" onclick="openAppPage('dataManagementPage')"><span><i class="menu-icon fas fa-database" style="color:var(--qq-blue);"></i>数据管理</span><div class="menu-item-right"></div></div><div class="menu-item" onclick="openAppPage('beautifySettingsPage')"><span><i class="menu-icon fas fa-palette" style="color:var(--qq-blue);"></i>美化设置</span><div class="menu-item-right"></div></div><div class="menu-item" onclick="openAppPage('worldbookMenuPage')"><span><i class="menu-icon fas fa-book" style="color:var(--qq-blue);"></i>世界书</span><div class="menu-item-right"></div></div></div><div style="margin-top: 20px; border-radius: 10px; margin: 20px 16px 0; overflow:hidden;"><div class="menu-item" onclick="openAppPage('screenModePage')"><span><i class="menu-icon fas fa-expand" style="color:var(--qq-blue);"></i>显示模式</span><div class="menu-item-right"></div></div><div class="menu-item" onclick="openAppPage('chatModePage')"><span><i class="menu-icon fas fa-comments" style="color:var(--qq-blue);"></i>聊天模式</span><div class="menu-item-right"></div></div><div class="menu-item" onclick="openAppPage('backgroundChatPage')"><span><i class="menu-icon fas fa-history" style="color:var(--qq-blue);"></i>后台聊天互动</span><div class="menu-item-right"></div></div><div class="menu-item" onclick="openAppPage('blacklistPage')"><span><i class="menu-icon fas fa-user-slash" style="color:var(--qq-blue);"></i>黑名单</span><div class="menu-item-right"></div></div></div></div>`; renderApiSettingsPage(); renderDataManagementPage(); renderScreenModePage(); renderChatModePage(); renderBackgroundChatPage(); renderBlacklistPage(); renderBeautifySettingsPage(); renderWorldbookMenuPage(); }
+        function renderApiSettingsPage() { const s = systemData.settings; document.getElementById('apiSettingsPage').innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeAppPage('apiSettingsPage')"><i class="fas fa-chevron-left"></i> <span class="back-text">设置</span></div><div class="app-title">API设置</div></div><div class="app-content"><div style="margin-top: 20px; border-radius: 10px; margin: 20px 16px 0; overflow:hidden;"><div class="form-group"><label for="apiProvider">API供应商</label><select id="apiProvider"><option value="openai" ${s.apiProvider === 'openai' ? 'selected' : ''}>OpenAI</option><option value="claude" ${s.apiProvider === 'claude' ? 'selected' : ''}>Claude (Anthropic)</option><option value="gemini" ${s.apiProvider === 'gemini' ? 'selected' : ''}>Gemini (Google AI Studio)</option><option value="deepseek" ${s.apiProvider === 'deepseek' ? 'selected' : ''}>Deepseek (深度求索)</option><option value="openrouter" ${s.apiProvider === 'openrouter' ? 'selected' : ''}>OpenRouter</option><option value="custom" ${s.apiProvider === 'custom' ? 'selected' : ''}>自定义 (OpenAI)</option></select></div><div class="form-group"><label for="apiUrl">URL链接</label><input type="url" id="apiUrl" value="${s.apiUrl}" placeholder="https://api.openai.com"></div><div class="form-group"><label for="apiKey">API密钥</label><input type="password" id="apiKey" value="${s.apiKey}" placeholder="输入您的API密钥"></div></div><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden;"><div class="form-group model-group"><label for="fetch-models-btn">模型</label><button id="fetch-models-btn" class="fetch-button" onclick="fetchModels()">获取</button></div><div id="apiModelsList" style="display: none; max-height: 150px; overflow-y: auto; background:white;"></div><p id="currentModelName" style="padding: 10px 16px; color: #888; background:white;">当前: ${s.selectedModel?.id || '未选择'}</p></div><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden;"><div class="slider-group"><label for="temperature">Temperature: <span id="temp-value">${s.temperature}</span></label><div class="slider-container"><input type="range" id="temperature" min="0" max="2" step="0.1" value="${s.temperature}" oninput="document.getElementById('temp-value').textContent = this.value"></div></div><div class="slider-group"><label for="top-p">Top P: <span id="topp-value">${s.top_p}</span></label><div class="slider-container"><input type="range" id="top-p" min="0" max="1" step="0.01" value="${s.top_p}" oninput="document.getElementById('topp-value').textContent = this.value"></div></div></div><div id="apiStatus" class="status-message" style="margin: 15px 16px;"></div><div class="form-actions"><button class="form-btn form-btn-primary" onclick="saveApiSettings()">保存设置</button></div></div>`; }
+        function renderDataManagementPage() { document.getElementById('dataManagementPage').innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeAppPage('dataManagementPage')"><i class="fas fa-chevron-left"></i> <span class="back-text">设置</span></div><div class="app-title">数据管理</div></div><div class="app-content"><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden; background:white; padding: 20px;"><h2 style="margin-top:0;">数据备份与恢复</h2><p style="color:#888; font-size:14px;">备份文件将包含您的所有角色、聊天记录和设置。只允许使用.json文件。</p><div class="form-actions" style="flex-direction:column; padding:0;"><button class="form-btn form-btn-primary" onclick="exportAllData()">导出全部数据 (.json)</button><button class="form-btn form-btn-secondary" onclick="document.getElementById('importFile').click()">导入数据 (.json)</button><input type="file" id="importFile" class="file-input" accept=".json" onchange="importData(this)"></div><div id="importStatus" class="status-message" style="margin:15px 0 0;"></div></div></div>`; }
+        function renderScreenModePage() { document.getElementById('screenModePage').innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeAppPage('screenModePage')"><i class="fas fa-chevron-left"></i> <span class="back-text">设置</span></div><div class="app-title">显示模式</div></div><div class="app-content"><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden;"><div class="menu-item"><label style="width:100%; display:flex; justify-content:space-between; align-items:center;"><span>全屏模式</span><input type="radio" name="screenMode" value="fullscreen" onchange="updateScreenMode(true)" ${systemData.settings.fullscreen ? 'checked' : ''}></label></div><div class="menu-item"><label style="width:100%; display:flex; justify-content:space-between; align-items:center;"><span>保留手机边框</span><input type="radio" name="screenMode" value="bordered" onchange="updateScreenMode(false)" ${!systemData.settings.fullscreen ? 'checked' : ''}></label></div></div></div>`; }
+        function renderChatModePage() { document.getElementById('chatModePage').innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeAppPage('chatModePage')"><i class="fas fa-chevron-left"></i> <span class="back-text">设置</span></div><div class="app-title">聊天模式</div></div><div class="app-content"><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden;"><div class="menu-item"><label style="width:100%; display:flex; justify-content:space-between; align-items:center;"><span>线上聊天连发模式</span><input type="radio" name="chatMode" value="online" onchange="updateChatMode(this.value)" ${systemData.settings.chatMode === 'online' ? 'checked' : ''}></label></div><div class="menu-item"><label style="width:100%; display:flex; justify-content:space-between; align-items:center;"><span>线下剧情模式</span><input type="radio" name="chatMode" value="offline" onchange="updateChatMode(this.value)" ${systemData.settings.chatMode === 'offline' ? 'checked' : ''}></label></div></div><p style="padding: 10px 20px; color: #888; font-size: 14px;"><b>线上模式：</b>模拟真实聊天，消息简短(每句约20字)，不带描述，AI可能连发多条(12-25条)。<br><b>线下模式：</b>专注于长篇剧情(8k-30k字)，段落化描写。</p></div>`; }
+        function renderBackgroundChatPage() { const bgSettings = systemData.settings.backgroundChat; document.getElementById('backgroundChatPage').innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeAppPage('backgroundChatPage')"><i class="fas fa-chevron-left"></i> <span class="back-text">设置</span></div><div class="app-title">后台聊天互动</div></div><div class="app-content"><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden;"><div class="menu-item"><label style="width:100%; display:flex; justify-content:space-between; align-items:center;"><span>开启后台互动</span><input type="checkbox" ${bgSettings.enabled ? 'checked' : ''} onchange="updateBackgroundChat('enabled', this.checked)"></label></div><div class="form-group"><label for="bg-chat-interval">互动间隔 (分钟)</label><input type="number" id="bg-chat-interval" value="${bgSettings.interval}" onchange="updateBackgroundChat('interval', this.value)"></div></div></div>`; }
+        function renderBlacklistPage() { const page = document.getElementById('blacklistPage'); const blacklist = systemData.settings.blacklist || []; const contacts = systemData.chat.contacts; page.innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeAppPage('blacklistPage')"><i class="fas fa-chevron-left"></i> <span class="back-text">设置</span></div><div class="app-title">黑名单</div></div><div class="app-content" style="padding-top:88px;">${blacklist.length > 0 ? blacklist.map(id => { const char = contacts.find(c => c.id == id); if (!char) return ''; return `<div class="chat-list-item"><img src="${char.avatar}" class="avatar"><div class="details"><div class="name">${char.name}</div></div><button onclick="unblockContact(${id})">移出</button></div>`; }).join('') : '<p style="text-align:center; color:#888; padding:50px;">黑名单为空</p>'}</div>`; }
+        function renderBeautifySettingsPage() { const b = systemData.beautify; const page = document.getElementById('beautifySettingsPage'); page.innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeAppPage('beautifySettingsPage')"><i class="fas fa-chevron-left"></i> <span class="back-text">设置</span></div><div class="app-title">美化设置</div></div><div class="app-content"><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden;"><div class="menu-item" onclick="document.getElementById('desktop-wallpaper-input').click()"><span>更换桌面壁纸</span><div class="menu-item-right"></div></div><input type="file" id="desktop-wallpaper-input" class="file-input" accept="image/*" onchange="handleFileUpload(this.files[0], url => { systemData.beautify.desktopWallpaper = url; applyBeautification(); })"><div class="menu-item" onclick="document.getElementById('chat-wallpaper-input').click()"><span>更换聊天壁纸</span><div class="menu-item-right"></div></div><input type="file" id="chat-wallpaper-input" class="file-input" accept="image/*" onchange="handleFileUpload(this.files[0], url => { systemData.beautify.chatWallpaper = url; })"></div><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden; background:white;"><div class="form-group"><label>聊天APP图标</label><input type="file" class="file-input" id="icon-input-chat" onchange="handleFileUpload(this.files[0], url => { systemData.beautify.appIcons.chat = url; applyBeautification(); })"><button onclick="document.getElementById('icon-input-chat').click()">选择图片</button></div><div class="form-group"><label>设置APP图标</label><input type="file" class="file-input" id="icon-input-settings" onchange="handleFileUpload(this.files[0], url => { systemData.beautify.appIcons.settings = url; applyBeautification(); })"><button onclick="document.getElementById('icon-input-settings').click()">选择图片</button></div><div class="form-group"><label>备忘录APP图标</label><input type="file" class="file-input" id="icon-input-memo" onchange="handleFileUpload(this.files[0], url => { systemData.beautify.appIcons.memo = url; applyBeautification(); })"><button onclick="document.getElementById('icon-input-memo').click()">选择图片</button></div></div><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden; background:white;"><div class="form-group"><label>聊天气泡CSS</label><textarea id="beautify-bubble-css" oninput="systemData.beautify.chatBubbleCss = this.value">${b.chatBubbleCss}</textarea></div><div class="form-group"><label>字体链接 (CSS/TTF)</label><input type="text" value="${b.fontUrl}" oninput="systemData.beautify.fontUrl = this.value"></div></div><div class="form-actions"><button class="form-btn form-btn-primary" onclick="applyBeautification(); saveSystemData(); alert('美化设置已保存并应用！')">保存所有美化设置</button></div></div>`; }
+        function updateScreenMode(isFullscreen) { document.getElementById('phone-container').classList.toggle('fullscreen', isFullscreen); systemData.settings.fullscreen = isFullscreen; saveSystemData(); }
+        function updateChatMode(mode) { systemData.settings.chatMode = mode; saveSystemData(); }
+        function updateBackgroundChat(key, value) { systemData.settings.backgroundChat[key] = key === 'interval' ? parseInt(value) : value; saveSystemData(); }
+        function saveApiSettings() { const s = systemData.settings; s.apiProvider = document.getElementById('apiProvider').value; s.apiUrl = document.getElementById('apiUrl').value.trim(); s.apiKey = document.getElementById('apiKey').value.trim(); s.temperature = parseFloat(document.getElementById('temperature').value); s.top_p = parseFloat(document.getElementById('top-p').value); saveSystemData(); document.getElementById('apiStatus').textContent = 'API设置已保存！'; document.getElementById('apiStatus').className = 'status-message success'; }
+        function exportAllData() { try { const filename = `S-Phone_Backup_${new Date().toISOString().slice(0,10)}.json`; const dataStr = JSON.stringify(systemData, null, 2); const blob = new Blob([dataStr], {type: "application/json"}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url); alert('导出成功！'); } catch(e) { alert('导出失败！请检查控制台。'); console.error(e); } }
+        function importData(input) { const file = input.files[0]; const statusEl = document.getElementById('importStatus'); if (!file) return; if (!file.name.endsWith('.json')) { statusEl.textContent = '导入失败: 请上传 .json 格式的备份文件。'; statusEl.className = 'status-message error'; return; } const reader = new FileReader(); reader.onload = e => { try { const data = JSON.parse(e.target.result); if (!data.version || data.version !== 'S-Phone-Omega-v4') throw new Error('备份文件格式或版本不兼容。'); if (confirm('确定导入数据？这将覆盖当前所有数据并刷新页面。')) { systemData = data; saveSystemData(); statusEl.textContent = '导入成功！应用即将刷新。'; statusEl.className = 'status-message success'; setTimeout(() => location.reload(), 1500); } } catch (err) { statusEl.textContent = `导入失败: ${err.message}`; statusEl.className = 'status-message error'; } }; reader.readAsText(file); }
+        async function fetchModels() { const u = document.getElementById('apiUrl').value.trim(); const k = document.getElementById('apiKey').value.trim(); const s = document.getElementById('apiStatus'), l = document.getElementById('apiModelsList'); l.style.display = 'none'; l.innerHTML = ''; if (!u || !k) { s.textContent = '错误：请填写完整的API URL和密钥。'; s.className = 'status-message error'; return; } s.textContent = '正在获取模型列表...'; s.className = 'status-message'; try { const res = await fetch(`${u.replace(/\/$/, "")}/v1/models`, { headers: { 'Authorization': `Bearer ${k}` } }); if (!res.ok) { const err = await res.text(); throw new Error(`(${res.status}) ${err}`); } const d = await res.json(); const m = d.data || []; if (m.length > 0) { l.innerHTML = ''; m.forEach(md => { const el = document.createElement('div'); el.className = 'menu-item'; el.textContent = md.id; if (systemData.settings.selectedModel && md.id === systemData.settings.selectedModel.id) el.classList.add('selected'); el.onclick = () => { document.querySelectorAll('#apiModelsList .menu-item.selected').forEach(i => i.classList.remove('selected')); el.classList.add('selected'); systemData.settings.selectedModel = { id: md.id }; document.getElementById('currentModelName').textContent = `当前: ${md.id}`; }; l.appendChild(el); }); l.style.display = 'block'; s.textContent = `成功获取 ${m.length} 个模型。`; s.className = 'status-message success'; } else { s.textContent = '警告：API响应成功，但未返回模型列表。'; s.className = 'status-message error'; } } catch (e) { s.textContent = `获取失败: ${e.message}`; s.className = 'status-message error'; console.error(e); } }
+
+        // --- 世界书 (设置内) ---
+        function renderWorldbookMenuPage() { const page = document.getElementById('worldbookMenuPage'); page.innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeAppPage('worldbookMenuPage')"><i class="fas fa-chevron-left"></i> <span class="back-text">设置</span></div><div class="app-title">世界书</div></div><div class="app-content"><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden;"><div class="menu-item" onclick="renderWorldbookListPage('presets')"><span><i class="menu-icon fas fa-cogs"></i>预设</span><div class="menu-item-right"></div></div><div class="menu-item" onclick="renderWorldbookListPage('styles')"><span><i class="menu-icon fas fa-paint-brush"></i>文风</span><div class="menu-item-right"></div></div><div class="menu-item" onclick="renderWorldbookListPage('library')"><span><i class="menu-icon fas fa-book-open"></i>世界书库</span><div class="menu-item-right"></div></div></div></div>`; }
+        function renderWorldbookListPage(type) { openAppPage('worldbookEditPage'); const page = document.getElementById('worldbookEditPage'); const typeMap = { presets: '预设', styles: '文风', library: '世界书库' }; const items = systemData.worldbooks[type]; page.innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeAppPage('worldbookEditPage'); renderWorldbookMenuPage();"><i class="fas fa-chevron-left"></i> <span class="back-text">世界书</span></div><div class="app-title">${typeMap[type]}</div><div class="app-header-icon" style="right:10px; position:absolute; font-size:24px;" onclick="editWorldbook('${type}')">+</div></div><div class="app-content" style="padding-top:88px;">${items.map(w => `<div class="menu-item" onclick="editWorldbook('${type}', ${w.id})"><span>${w.name}</span><div class="menu-item-right"></div></div>`).join('') || `<p style="text-align:center; color:#888; padding:50px;">暂无${typeMap[type]}</p>`}</div>`; }
+        function editWorldbook(type, id = null) { const isNew = id === null; const item = isNew ? { id: Date.now(), name: '', content: '' } : systemData.worldbooks[type].find(i => i.id === id); if (!item) return; const typeMap = { presets: '预设', styles: '文风', library: '世界书' }; const title = (isNew ? '新建' : '编辑') + typeMap[type]; const content = `<div style="height:80vh; display:flex; flex-direction:column;"><h3 style="text-align:center;">${title}</h3><div class="form-group"><label>名称</label><input type="text" id="wb-edit-name" value="${item.name}"></div><div class="form-group" style="flex:1; display:flex; flex-direction:column;"><label>内容 (无字数上限)</label><textarea id="wb-edit-content" style="flex:1;">${item.content}</textarea></div><div class="form-actions">${!isNew ? `<button class="form-btn form-btn-secondary" onclick="deleteWorldbook('${type}', ${id})">删除</button>` : ''}<button class="form-btn form-btn-primary" onclick="saveWorldbook('${type}', ${id}, ${isNew})">保存</button></div></div>`; showModal('genericModal', content); }
+        function saveWorldbook(type, id, isNew) { const name = document.getElementById('wb-edit-name').value; const content = document.getElementById('wb-edit-content').value; if (!name) { alert('名称不能为空'); return; } if (isNew) { systemData.worldbooks[type].push({ id: Date.now(), name, content }); } else { const index = systemData.worldbooks[type].findIndex(i => i.id === id); systemData.worldbooks[type][index] = { id, name, content }; } saveSystemData(); closeModal('genericModal'); renderWorldbookListPage(type); }
+        function deleteWorldbook(type, id) { if (!confirm('确定删除吗？')) return; systemData.worldbooks[type] = systemData.worldbooks[type].filter(i => i.id !== id); saveSystemData(); closeModal('genericModal'); renderWorldbookListPage(type); }
+
+        // --- 聊天APP ---
+        function renderChatApp() { const n = `<div class="nav-item" onclick="switchChatPage('messages')"><i class="fas fa-comment-dots"></i><span>消息</span></div><div class="nav-item" onclick="switchChatPage('contacts')"><i class="fas fa-users"></i><span>联系人</span></div><div class="nav-item" onclick="switchChatPage('moments')"><i class="fas fa-star"></i><span>动态</span></div><div class="nav-item" onclick="switchChatPage('me')"><i class="fas fa-user-circle"></i><span>我</span></div>`; const p = { messages: '', contacts: '', moments: '', me: '' }; renderAppWithPages('chat', n, p); renderChatMessagesPage(); renderChatContactsPage(); renderChatMomentsPage(); renderChatMePage(); }
+        function switchChatPage(pageId) { switchAppPage('chat', pageId); }
+        function renderChatMessagesPage() { const page = document.getElementById('chat-messages-page'); const contacts = systemData.chat.contacts; let content = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeApp('chat')"><i class="fas fa-chevron-left"></i></div><div class="app-title">消息</div><div class="app-header-icon" style="right:10px; position:absolute; font-size:24px;" onclick="showCreateMenu(event)">+</div></div><div class="app-content" style="padding-top:88px; padding-bottom:0;">`; if (contacts.length === 0) { content += '<p style="text-align:center; color:#888; padding:50px;">还没有好友，快去创建一个吧！</p>'; } else { content += contacts.map(c => { const lastMsg = c.conversation && c.conversation.length > 0 ? c.conversation[c.conversation.length - 1] : {text: '...', timestamp: Date.now()}; let lastMsgText = lastMsg.text; if(lastMsg.type === 'system') lastMsgText = '[系统消息]'; if(lastMsg.type === 'transfer') lastMsgText = '[转账]'; if(lastMsg.type === 'redpacket') lastMsgText = '[红包]'; return `<div class="chat-list-item" onclick="openConversationPage(${c.id})"><img src="${c.avatar}" class="avatar"><div class="details"><div class="name">${c.remark || c.name}</div><div class="last-message">${lastMsgText}</div></div><div class="info"><span class="time">${new Date(lastMsg.timestamp).toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'})}</span></div></div>`; }).join(''); } content += '</div>'; page.innerHTML = content; }
+        function renderChatContactsPage() { const page = document.getElementById('chat-contacts-page'); const contacts = systemData.chat.contacts; page.innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeApp('chat')"><i class="fas fa-chevron-left"></i></div><div class="app-title">联系人</div></div><div class="app-content" style="padding-top:88px; padding-bottom:0;"><div class="contact-group-header">我的好友</div>${contacts.map(c => `<div class="chat-list-item" onclick="openChatProfilePage(${c.id})"><img src="${c.avatar}" class="avatar"><div class="details"><div class="name">${c.remark || c.name}</div></div></div>`).join('')}</div>`; }
+        function renderChatMomentsPage() { const page = document.getElementById('chat-moments-page'); page.innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeApp('chat')"><i class="fas fa-chevron-left"></i></div><div class="app-title">动态</div></div><div class="app-content" style="padding:0; padding-top:88px; padding-bottom:0;"><div class="moments-header-bg"><i class="fas fa-camera moments-publish-btn" onclick="openMomentEditor()"></i></div><div class="moments-feed">${systemData.chat.moments.map(m => renderMomentItem(m)).join('') || '<p style="text-align:center; color:#888; padding:50px;">还没有动态</p>'}</div></div>`; }
+        function renderMomentItem(moment) { const author = moment.authorId === 'user_me' ? systemData.chat.me : systemData.chat.contacts.find(c => c.id == moment.authorId); if (!author) return ''; return `<div class="moment-item"><div class="moment-header"><img src="${author.avatar}" class="moment-avatar"><span class="moment-author">${author.name}</span></div><div class="moment-content">${moment.content}</div>${moment.media ? `<div class="moment-media">${moment.media.type === 'image' ? `<img src="${moment.media.url}">` : `<video src="${moment.media.url}" controls></video>`}</div>` : ''}<div class="moment-footer"><span>${new Date(moment.timestamp).toLocaleString()}</span><div class="moment-actions"><span onclick="likeMoment(${moment.id})"><i class="far fa-thumbs-up"></i> ${moment.likes.length}</span><span onclick="commentOnMoment(${moment.id})"><i class="far fa-comment"></i> ${moment.comments.length}</span></div></div><div class="moment-comments-section">${moment.comments.map(c => { const cAuthor = c.authorId === 'user_me' ? systemData.chat.me : systemData.chat.contacts.find(cId => cId.id == c.authorId); return `<div class="moment-comment"><span class="comment-author">${cAuthor?.name || '未知'}:</span> ${c.content}</div>`; }).join('')}</div></div>`; }
+        function openMomentEditor() { openAppPage('momentEditorPage'); document.getElementById('momentEditorPage').innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeAppPage('momentEditorPage')"><i class="fas fa-chevron-left"></i></div><div class="app-title">发表动态</div><button class="form-btn form-btn-primary" style="flex:none; padding: 5px 10px; margin-right: 10px;" onclick="publishMoment()">发表</button></div><div class="app-content" style="padding: 10px; padding-top: 98px;"><textarea id="moment-content-input" style="width:100%; height: 30vh; border:none; font-size:16px;" placeholder="分享新鲜事... (上限10000字)" maxlength="10000"></textarea><div class="form-group"><label>添加图片/视频/文件</label><input type="file" id="moment-media-input" accept="image/*,video/*,application/*"></div></div>`; }
+        function publishMoment() { const content = document.getElementById('moment-content-input').value.trim(); const mediaFile = document.getElementById('moment-media-input').files[0]; if (!content && !mediaFile) return; const newMoment = { id: Date.now(), authorId: 'user_me', content, timestamp: Date.now(), likes: [], comments: [] }; if (mediaFile) { handleFileUpload(mediaFile, url => { newMoment.media = { type: mediaFile.type.startsWith('image') ? 'image' : 'video', url }; systemData.chat.moments.unshift(newMoment); saveSystemData(); renderChatMomentsPage(); closeAppPage('momentEditorPage'); }); } else { systemData.chat.moments.unshift(newMoment); saveSystemData(); renderChatMomentsPage(); closeAppPage('momentEditorPage'); } }
+        function likeMoment(momentId) { const moment = systemData.chat.moments.find(m => m.id === momentId); if (moment && !moment.likes.includes('user_me')) { moment.likes.push('user_me'); saveSystemData(); renderChatMomentsPage(); } }
+        function commentOnMoment(momentId) { const commentContent = prompt('请输入你的评论:'); if (!commentContent) return; const moment = systemData.chat.moments.find(m => m.id === momentId); if (moment) { moment.comments.push({ authorId: 'user_me', content: commentContent }); saveSystemData(); renderChatMomentsPage(); } }
+        function renderChatMePage() { const me = systemData.chat.me; document.getElementById('chat-me-page').innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeApp('chat')"><i class="fas fa-chevron-left"></i></div><div class="app-title">我</div></div><div class="app-content"><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden; background:white; display:flex; align-items:center; padding:20px; gap:15px;"><img src="${me.avatar}" class="profile-avatar" style="width: 80px; height: 80px;" onclick="document.getElementById('chat-me-avatar-input').click()"><input type="file" id="chat-me-avatar-input" class="file-input" onchange="handleFileUpload(this.files[0], url => { systemData.chat.me.avatar = url; saveSystemData(); renderChatMePage(); })"><div><span style="font-size: 20px; font-weight: bold;">${me.name}</span><p style="font-size:14px; color:#888; margin:5px 0 0;" onclick="editMyProfile('signature')">${me.signature}</p></div></div><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden;"><div class="menu-item" onclick="editMyProfile('persona')"><span><i class="menu-icon fas fa-id-card"></i>编辑设定</span><div class="menu-item-right"></div></div><div class="menu-item" onclick="openAppPage('balanceDetailPage')"><span><i class="menu-icon fas fa-wallet"></i>我的钱包</span><div class="menu-item-right"><span>¥${me.balance.toFixed(2)}</span></div></div><div class="menu-item" onclick="topUpBalance()"><span><i class="menu-icon fas fa-money-bill-wave"></i>充值</span><div class="menu-item-right"></div></div><div class="menu-item" onclick="withdrawBalance()"><span><i class="menu-icon fas fa-hand-holding-usd"></i>提现</span><div class="menu-item-right"></div></div><div class="menu-item" onclick="editMyProfile('autoReply')"><span><i class="menu-icon fas fa-robot"></i>离线自动回复</span><div class="menu-item-right"></div></div></div></div>`; renderBalanceDetailPage(); }
+        function editMyProfile(field) { const me = systemData.chat.me; const currentVal = me[field]; const titleMap = {name: '昵称', signature: '个性签名', persona: '我的设定', autoReply: '离线自动回复'}; const newVal = prompt(`修改${titleMap[field]}:`, currentVal); if (newVal !== null) { me[field] = newVal; saveSystemData(); renderChatMePage(); } }
+        function showCreateMenu(event) { event.stopPropagation(); const menu = document.getElementById('mainContextMenu'); menu.innerHTML = `<div class="context-menu-item" onclick="openCharacterCreatorPage()">创建好友角色</div><div class="context-menu-item" onclick="alert('创建群聊功能开发中')">创建群聊</div>`; menu.style.display = 'block'; menu.style.top = `${event.target.getBoundingClientRect().bottom + 5}px`; menu.style.right = `10px`; document.body.addEventListener('click', () => menu.style.display = 'none', { once: true }); }
+        function openCharacterCreatorPage() { openAppPage('characterCreatorPage'); const page = document.getElementById('characterCreatorPage'); page.innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeAppPage('characterCreatorPage')"><i class="fas fa-chevron-left"></i> <span class="back-text">消息</span></div><div class="app-title">创建好友角色</div></div><div class="app-content"><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden; background:white;"><div style="text-align:center; padding: 20px;"><img id="char-creator-avatar-preview" src="https://via.placeholder.com/80?text=Avatar" class="profile-avatar" style="width:80px; height:80px;" onclick="document.getElementById('char-creator-avatar-input').click()"><input type="file" id="char-creator-avatar-input" class="file-input" accept="image/*"></div><div class="form-group"><label>名称</label><input type="text" id="char-creator-name"></div><div class="form-group"><label>设定 (Persona)</label><textarea id="char-creator-persona" rows="10"></textarea></div></div><div class="form-actions"><button class="form-btn form-btn-primary" onclick="createNewCharacter()">创建</button></div></div>`; document.getElementById('char-creator-avatar-input').onchange = e => handleFileUpload(e.target.files[0], dataUrl => document.getElementById('char-creator-avatar-preview').src = dataUrl); }
+        function createNewCharacter() { const name = document.getElementById('char-creator-name').value; const persona = document.getElementById('char-creator-persona').value; const avatar = document.getElementById('char-creator-avatar-preview').src; if (!name) { alert('角色名称不能为空'); return; } const newChar = { id: Date.now(), name, avatar, persona, signature: '...', conversation: [], worldbookIds: [] }; systemData.chat.contacts.push(newChar); saveSystemData(); renderChatMessagesPage(); renderChatContactsPage(); closeAppPage('characterCreatorPage'); }
+        function openConversationPage(contactId) { systemData.chat.currentChatId = contactId; openAppPage('conversationPage'); renderConversationPage(contactId); }
+        function renderConversationPage(contactId) { const contact = systemData.chat.contacts.find(c => c.id == contactId); if (!contact) return; const page = document.getElementById('conversationPage'); page.innerHTML = `<div class="conversation-page" id="conversation-page-bg-${contactId}"><div class="conversation-header"><div class="app-back-btn" onclick="closeAppPage('conversationPage')"><i class="fas fa-chevron-left"></i></div><div class="title-container"><span class="title">${contact.remark || contact.name}</span>${contact.remark ? `<span class="remark">${contact.name}</span>` : ''}</div><div class="app-header-icon settings-btn" onclick="showChatSettingsMenu(event, ${contactId})"></div></div><div class="message-area" id="message-area-${contactId}"></div><div class="chat-input-bar"><div class="icon-btn" style="background-image: url('https://tc.z.wiki/autoupload/f/_dUEGnKEJQzmc-cKlsXN5NiO_OyvX7mIgxFBfDMDErs/20251025/h86b/640X594/Image_1761364260149.png');" onclick="getAiReply(${contactId})"></div><div class="input-container"><div class="quote-preview" id="quote-preview-${contactId}" style="display:none;"><span class="close-quote" onclick="cancelQuote(${contactId})">&times;</span><span id="quote-text-${contactId}"></span></div><textarea id="chat-input-${contactId}" placeholder="发送消息..." oninput="toggleSendButton(${contactId})" onkeydown="if(event.key==='Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(${contactId}); }"></textarea></div><button id="send-btn-${contactId}" class="send-btn" onclick="sendMessage(${contactId})">发送</button><div id="plus-btn-${contactId}" class="icon-btn" style="background-image: url('https://img.heliar.top/file/1761705524078_retouch_2025102516445918.png');" onclick="toggleChatPlusMenu()"></div></div><div class="chat-plus-menu" id="chat-plus-menu"><div class="chat-plus-menu-item" onclick="showTransferModal('transfer', ${contactId})"><div class="icon"><i class="fas fa-exchange-alt"></i></div><span>转账</span></div><div class="chat-plus-menu-item" onclick="showTransferModal('redpacket', ${contactId})"><div class="icon"><i class="fas fa-wallet"></i></div><span>红包</span></div><div class="chat-plus-menu-item" onclick="alert('功能开发中')"><div class="icon"><i class="fas fa-music"></i></div><span>一起听</span></div><div class="chat-plus-menu-item" onclick="alert('功能开发中')"><div class="icon"><i class="far fa-grin-wink"></i></div><span>表情包</span></div><div class="chat-plus-menu-item" onclick="alert('功能开发中')"><div class="icon"><i class="fas fa-microphone"></i></div><span>语音</span></div><div class="chat-plus-menu-item" onclick="alert('功能开发中')"><div class="icon"><i class="fas fa-map-marker-alt"></i></div><span>位置</span></div><div class="chat-plus-menu-item" onclick="alert('查看日记功能开发中')"><div class="icon"><i class="fas fa-book-open"></i></div><span>查看日记</span></div><div class="chat-plus-menu-item" onclick="openIntegratedApp('delivery')"><div class="icon"><i class="fas fa-store"></i></div><span>外卖</span></div><div class="chat-plus-menu-item" onclick="openIntegratedApp('douban')"><div class="icon"><i class="fas fa-comments"></i></div><span>豆瓣</span></div></div></div>`; if(systemData.beautify.chatWallpaper) document.getElementById(`conversation-page-bg-${contactId}`).style.backgroundImage = `url(${systemData.beautify.chatWallpaper})`; renderMessages(contactId); }
+        function toggleSendButton(contactId) { const input = document.getElementById(`chat-input-${contactId}`); const sendBtn = document.getElementById(`send-btn-${contactId}`); const plusBtn = document.getElementById(`plus-btn-${contactId}`); if (input.value.trim().length > 0) { sendBtn.style.display = 'block'; plusBtn.style.display = 'none'; } else { sendBtn.style.display = 'none'; plusBtn.style.display = 'block'; } }
+        function renderMessages(contactId) { const area = document.getElementById(`message-area-${contactId}`); const contact = systemData.chat.contacts.find(c => c.id == contactId); if (!contact || !contact.conversation) return; area.innerHTML = contact.conversation.map((msg, index) => { if (msg.type === 'system') { return msg.text; } if (msg.type === 'transfer' || msg.type === 'redpacket') { const senderAvatar = msg.sender === 'me' ? systemData.chat.me.avatar : contact.avatar; const bubbleClass = msg.type === 'transfer' ? 'transfer-bubble' : 'redpacket-bubble'; const iconClass = msg.type === 'transfer' ? 'fas fa-exchange-alt' : 'fas fa-wallet'; return `<div class="message-bubble ${msg.sender === 'me' ? 'sent' : 'received'}" ondblclick="showMessageContextMenu(event, ${contactId}, ${index})"><img src="${senderAvatar}" class="avatar"><div class="content-wrapper"><div class="${bubbleClass}"><div class="icon"><i class="${iconClass}"></i></div><div class="details"><span class="amount">¥${msg.amount.toFixed(2)}</span><span class="remark">${msg.text}</span></div></div></div></div>`; } return `<div class="message-bubble ${msg.sender === 'me' ? 'sent' : 'received'}" ondblclick="showMessageContextMenu(event, ${contactId}, ${index})"><img src="${msg.sender === 'me' ? systemData.chat.me.avatar : contact.avatar}" class="avatar" ondblclick="pokeCharacter('${msg.sender === 'me' ? 'user_me' : contact.id}')" onclick="openChatProfilePage('${msg.sender === 'me' ? 'user_me' : contact.id}')"><div class="content-wrapper"><div class="content">${msg.quote ? `<div class="quote-preview" style="margin-bottom:5px;">${msg.quote}</div>` : ''}${msg.text}</div></div></div>`; }).join(''); area.scrollTop = area.scrollHeight; }
+        function sendMessage(contactId) { const input = document.getElementById(`chat-input-${contactId}`); const text = input.value.trim(); if (!text) return; const contact = systemData.chat.contacts.find(c => c.id == contactId); if (!contact) return; if (!contact.conversation) contact.conversation = []; const quotePreview = document.getElementById(`quote-preview-${contactId}`); const quoteText = quotePreview.style.display !== 'none' ? quotePreview.dataset.quoteText : null; contact.conversation.push({ sender: 'me', text, timestamp: Date.now(), quote: quoteText }); input.value = ''; cancelQuote(contactId); toggleSendButton(contactId); renderMessages(contactId); saveSystemData(); }
+        async function getAiReply(contactId) { const contact = systemData.chat.contacts.find(c => c.id == contactId); if (!contact) return; const area = document.getElementById(`message-area-${contactId}`); area.innerHTML += '<p id="typing-indicator" style="text-align:center; color:#888;">对方正在输入...</p>'; area.scrollTop = area.scrollHeight; try { const history = contact.conversation.map(m => `${m.sender === 'me' ? systemData.chat.me.name : contact.name}: ${m.text}`).join('\n'); const prompt = `你正在扮演角色“${contact.name}”，你的设定是：“${contact.persona}”。以下是你们的聊天记录：\n${history}\n请根据你的角色性格，对最后一句话做出回应。`; const replies = await callAI(prompt, contact); if (systemData.settings.chatMode === 'online') { const replyLines = replies.split(/[\n.!?]+/).filter(line => line.trim() !== '' && line.length <= 20); for (const reply of replyLines.slice(0, Math.floor(Math.random() * 14) + 12)) { contact.conversation.push({ sender: 'contact', text: reply, timestamp: Date.now() }); renderMessages(contactId); await new Promise(r => setTimeout(r, 200 + Math.random() * 300)); } } else { contact.conversation.push({ sender: 'contact', text: replies, timestamp: Date.now() }); } saveSystemData(); } catch (e) { contact.conversation.push({ sender: 'contact', text: `(系统错误: ${e.message})`, timestamp: Date.now() }); } finally { document.getElementById('typing-indicator')?.remove(); renderMessages(contactId); } }
+        function retractMessage(contactId, msgIndex, who) { const contact = systemData.chat.contacts.find(c => c.id == contactId); if (!contact) return; if (msgIndex === -1) { msgIndex = contact.conversation.length - 1; } const msg = contact.conversation[msgIndex]; if (!msg) return; if (who === 'user' && (Date.now() - msg.timestamp) > 120000) { alert('超过2分钟的消息无法撤回'); return; } const name = who === 'user' ? '你' : (contact.remark || contact.name); contact.conversation[msgIndex] = { type: 'system', text: `<div style="text-align:center; margin-top:2px; margin-bottom:2px;"><span style="background-color:rgba(229,229,234,0.7); color:rgb(51,51,51); font-size:12px; padding:3px 8px; border-radius:8px; display:inline-block;">${name}撤回了一条消息</span></div>`, timestamp: Date.now() }; saveSystemData(); renderMessages(contactId); }
+        function toggleChatPlusMenu() { const menu = document.getElementById('chat-plus-menu'); menu.style.display = menu.style.display === 'grid' ? 'none' : 'grid'; }
+        function showTransferModal(type, contactId) { toggleChatPlusMenu(); const title = type === 'transfer' ? '转账' : '红包'; const maxAmount = type === 'transfer' ? 500000 : 200; const content = `<h3>${title}</h3><div class="form-group"><label>金额 (元)</label><input type="number" id="transfer-amount" placeholder="0.00" min="0.01" max="${maxAmount}"></div><div class="form-group"><label>备注 (最多10字)</label><input type="text" id="transfer-remark" maxlength="10"></div><div class="form-actions"><button class="form-btn form-btn-secondary" onclick="closeModal('genericModal')">取消</button><button class="form-btn form-btn-primary" onclick="sendTransfer('${type}', ${contactId})">发送</button></div>`; showModal('genericModal', content); }
+        function sendTransfer(type, contactId) { const amount = parseFloat(document.getElementById('transfer-amount').value); const remark = document.getElementById('transfer-remark').value || (type === 'transfer' ? '转账' : '恭喜发财，大吉大利！'); if (isNaN(amount) || amount <= 0) { alert('请输入有效金额'); return; } const maxAmount = type === 'transfer' ? 500000 : 200; if (amount > maxAmount) { alert(`金额不能超过 ${maxAmount} 元`); return; } const contact = systemData.chat.contacts.find(c => c.id == contactId); if (!contact) return; if (!contact.conversation) contact.conversation = []; contact.conversation.push({ sender: 'me', type, text: remark, amount, timestamp: Date.now() }); saveSystemData(); renderMessages(contactId); closeModal('genericModal'); }
+        function showChatSettingsMenu(event, contactId) { event.stopPropagation(); const menu = document.getElementById('mainContextMenu'); menu.innerHTML = `<div class="context-menu-item" onclick="deleteContact(${contactId})">删除好友</div><div class="context-menu-item" onclick="blockContact(${contactId})">拉黑好友</div><div class="context-menu-item" onclick="clearHistory(${contactId})">清除聊天记录</div><div class="context-menu-item" onclick="alert('功能开发中')">特别关心</div><div class="context-menu-item" onclick="editContactRemark(${contactId})">好友备注</div><div class="context-menu-item" onclick="openPokeSettingsPage(${contactId})">戳一戳</div><div class="context-menu-item" onclick="viewInnerThoughts(${contactId})">查看对方心声</div><div class="context-menu-item" onclick="viewAutoReply(${contactId})">查看对方自动回复</div>`; menu.style.display = 'block'; menu.style.top = `${event.target.getBoundingClientRect().bottom + 5}px`; menu.style.right = `10px`; document.body.addEventListener('click', () => menu.style.display = 'none', { once: true }); }
+        function deleteContact(contactId) { if (!confirm('确定删除该好友吗？好友关系将被解除。')) return; systemData.chat.contacts = systemData.chat.contacts.filter(c => c.id != contactId); saveSystemData(); renderChatMessagesPage(); renderChatContactsPage(); closeAppPage('conversationPage'); }
+        function blockContact(contactId) { if (!systemData.settings.blacklist) systemData.settings.blacklist = []; if (!systemData.settings.blacklist.includes(contactId)) { systemData.settings.blacklist.push(contactId); saveSystemData(); alert('已拉黑'); } }
+        function unblockContact(contactId) { systemData.settings.blacklist = systemData.settings.blacklist.filter(id => id != contactId); saveSystemData(); renderBlacklistPage(); }
+        function clearHistory(contactId) { if (!confirm('确定清空聊天记录吗？此操作不可恢复。')) return; const contact = systemData.chat.contacts.find(c => c.id == contactId); if (contact) { contact.conversation = []; saveSystemData(); renderMessages(contactId); } }
+        function editContactRemark(contactId) { const contact = systemData.chat.contacts.find(c => c.id == contactId); if (!contact) return; const newRemark = prompt('请输入新的备注名:', contact.remark || ''); if (newRemark !== null) { contact.remark = newRemark; saveSystemData(); renderConversationPage(contactId); renderChatMessagesPage(); renderChatContactsPage(); } }
+        function openChatProfilePage(id) { openAppPage('chatProfilePage'); const page = document.getElementById('chatProfilePage'); const isMe = id === 'user_me'; const profile = isMe ? systemData.chat.me : systemData.chat.contacts.find(c => c.id == id); if (!profile) return; page.innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeAppPage('chatProfilePage')"><i class="fas fa-chevron-left"></i></div><div class="app-title">个人资料</div></div><div class="app-content"><div class="chat-profile-header" style="margin: 20px 16px; padding: 30px 20px;"><img src="${profile.avatar}" class="profile-avatar avatar" style="width:80px; height:80px;" ondblclick="pokeCharacter('${id}')" onclick="${!isMe ? `document.getElementById('char-profile-avatar-input').click()` : ''}"><input type="file" id="char-profile-avatar-input" class="file-input" onchange="handleFileUpload(this.files[0], url => { systemData.chat.contacts.find(c=>c.id==${id}).avatar = url; saveSystemData(); openChatProfilePage(${id}); })"><span class="name">${profile.remark || profile.name}</span><span class="signature" onclick="${!isMe ? `editCharProfile(${id}, 'signature')` : ''}">${profile.signature}</span></div><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden; background:white;"><div class="form-group"><label>设定 (无字数上限)</label><textarea style="height:30vh;" ${isMe ? 'disabled' : ''} oninput="systemData.chat.contacts.find(c=>c.id==${id}).persona = this.value; saveSystemData();">${isMe ? '这是您自己，请在“我”页面编辑设定。' : profile.persona}</textarea></div></div></div>`; }
+        function editCharProfile(id, field) { const char = systemData.chat.contacts.find(c => c.id == id); if (!char) return; const newVal = prompt(`修改${field === 'signature' ? '个性签名 (120字上限)' : '名称'}:`, char[field]); if (newVal !== null) { char[field] = newVal.substring(0, 120); saveSystemData(); openChatProfilePage(id); } }
+        function showMessageContextMenu(event, contactId, msgIndex) { event.stopPropagation(); const menu = document.getElementById('messageContextMenu'); const contact = systemData.chat.contacts.find(c => c.id == contactId); const msg = contact.conversation[msgIndex]; let items = `<div class="context-menu-item" onclick="quoteMessage(${contactId}, ${msgIndex})">引用</div>`; if (msg.sender === 'me') { items += `<div class="context-menu-item" onclick="retractMessage(${contactId}, ${msgIndex}, 'user')">撤回</div>`; } items += `<div class="context-menu-item" onclick="deleteMessage(${contactId}, ${msgIndex})">删除</div><div class="context-menu-item" onclick="alert('多选功能开发中')">多选</div>`; menu.innerHTML = items; menu.style.display = 'block'; menu.style.top = `${event.clientY}px`; menu.style.left = `${event.clientX}px`; document.body.addEventListener('click', () => menu.style.display = 'none', { once: true }); }
+        function deleteMessage(contactId, msgIndex) { const contact = systemData.chat.contacts.find(c => c.id == contactId); contact.conversation.splice(msgIndex, 1); saveSystemData(); renderMessages(contactId); }
+        function quoteMessage(contactId, msgIndex) { const contact = systemData.chat.contacts.find(c => c.id == contactId); const msg = contact.conversation[msgIndex]; const quotePreview = document.getElementById(`quote-preview-${contactId}`); const quoteTextEl = document.getElementById(`quote-text-${contactId}`); const authorName = msg.sender === 'me' ? systemData.chat.me.name : (contact.remark || contact.name); const quoteContent = `${authorName}: ${msg.text}`; quoteTextEl.textContent = quoteContent.length > 30 ? quoteContent.substring(0, 30) + '...' : quoteContent; quotePreview.dataset.quoteText = quoteContent; quotePreview.style.display = 'block'; }
+        function cancelQuote(contactId) { const quotePreview = document.getElementById(`quote-preview-${contactId}`); quotePreview.style.display = 'none'; quotePreview.dataset.quoteText = ''; }
+        async function viewInnerThoughts(contactId) { const contact = systemData.chat.contacts.find(c => c.id == contactId); if (!contact) return; const prompt = `查看心声：根据角色 ${contact.name} (${contact.persona}) 的设定和当前对话情景，生成一段不超过200字的内心独白。`; const thoughts = await callAI(prompt, contact); alert(`[${contact.name}的心声]\n${thoughts}`); }
+        function viewAutoReply(contactId) { const contact = systemData.chat.contacts.find(c => c.id == contactId); if (!contact) return; const autoReply = contact.autoReply || '[自动回复]你好，我是自动回复。您的聊天对象暂时不在，您可以和我聊天，但是我也只会这一句'; alert(`对方的自动回复：\n${autoReply}`); }
+        function openPokeSettingsPage(contactId) { const contact = systemData.chat.contacts.find(c => c.id == contactId); if (!contact) return; const settings = contact.pokeSettings || { user: '拍了拍', char: '拍了拍' }; const actions = ['揉了揉', '拍了拍', '戳了戳', '捏了捏', '弹了弹']; const content = `<h3>戳一戳设置</h3><div class="form-group"><label>我戳对方时:</label><select id="poke-user-action">${actions.map(a => `<option value="${a}" ${settings.user === a ? 'selected' : ''}>${a}</option>`).join('')}</select></div><div class="form-group"><label>对方戳我时:</label><select id="poke-char-action">${actions.map(a => `<option value="${a}" ${settings.char === a ? 'selected' : ''}>${a}</option>`).join('')}</select></div><div class="form-actions"><button class="form-btn form-btn-primary" onclick="savePokeSettings(${contactId})">保存</button></div>`; showModal('genericModal', content); }
+        function savePokeSettings(contactId) { const contact = systemData.chat.contacts.find(c => c.id == contactId); if (!contact) return; contact.pokeSettings = { user: document.getElementById('poke-user-action').value, char: document.getElementById('poke-char-action').value }; saveSystemData(); closeModal('genericModal'); }
+        function pokeCharacter(charId) { const isMe = charId === 'user_me'; if (isMe) return; const contact = systemData.chat.contacts.find(c => c.id == charId); if (!contact) return; const pokeAction = contact.pokeSettings?.user || '拍了拍'; const pokeMessage = `你${pokeAction}了${contact.remark || contact.name}`; contact.conversation.push({ type: 'system', text: `<div class="system-message-bubble"><span>${pokeMessage}</span></div>`, timestamp: Date.now() }); saveSystemData(); if (systemData.chat.currentChatId == charId) { renderMessages(charId); } alert(pokeMessage); }
+        function renderBalanceDetailPage() { const me = systemData.chat.me; const page = document.getElementById('balanceDetailPage'); page.innerHTML = `<div class="app-navigation-bar"><div class="app-back-btn" onclick="closeAppPage('balanceDetailPage')"><i class="fas fa-chevron-left"></i> <span class="back-text">我</span></div><div class="app-title">钱包明细</div></div><div class="app-content" style="padding-top:88px;">${me.transactions.map(t => `<div class="menu-item"><div><p style="margin:0; font-weight:bold;">${t.remark}</p><p style="margin:0; font-size:12px; color:#888;">${new Date(t.timestamp).toLocaleString()}</p></div><span style="color:${t.type === '收入' ? 'green' : 'red'};">${t.type === '收入' ? '+' : '-'}${t.amount.toFixed(2)}</span></div>`).join('') || '<p style="text-align:center; color:#888; padding:50px;">暂无交易记录</p>'}</div>`; }
+        function topUpBalance() { const amount = parseFloat(prompt('请输入充值金额:')); if (!isNaN(amount) && amount > 0) { systemData.chat.me.balance += amount; systemData.chat.me.transactions.unshift({ type: '收入', amount, remark: '充值', timestamp: Date.now() }); saveSystemData(); renderChatMePage(); } }
+        function withdrawBalance() { const amount = parseFloat(prompt('请输入提现金额 (上限500000):')); if (!isNaN(amount) && amount > 0 && amount <= 500000 && amount <= systemData.chat.me.balance) { systemData.chat.me.balance -= amount; systemData.chat.me.transactions.unshift({ type: '支出', amount, remark: '提现', timestamp: Date.now() }); saveSystemData(); renderChatMePage(); } else { alert('金额无效或余额不足'); } }
+        
+        // --- 集成应用 (外卖/豆瓣) ---
+        function openIntegratedApp(appName) { const modalContent = `<div id="integrated-app-view" style="height: 80vh; display: flex; flex-direction: column;"></div>`; showModal('genericModal', modalContent); if (appName === 'delivery') { renderDeliveryApp(document.getElementById('integrated-app-view')); } else if (appName === 'douban') { renderDoubanApp(document.getElementById('integrated-app-view')); } }
+        function renderDeliveryApp(container) { const n = `<div class="nav-item" onclick="switchIntegratedPage('delivery', 'home')"><i class="fas fa-store"></i><span>首页</span></div><div class="nav-item" onclick="switchIntegratedPage('delivery', 'cart')"><i class="fas fa-shopping-cart"></i><span>购物车</span></div><div class="nav-item" onclick="switchIntegratedPage('delivery', 'orders')"><i class="fas fa-box"></i><span>订单</span></div><div class="nav-item" onclick="switchIntegratedPage('delivery', 'me')"><i class="fas fa-user"></i><span>我</span></div>`; const p = { home: '', cart: '', orders: '', me: '' }; renderIntegratedAppWithPages(container, 'delivery', n, p); renderDeliveryHomePage(); renderDeliveryCartPage(); renderDeliveryOrdersPage(); renderDeliveryMePage(); refreshDelivery(); }
+        function renderDoubanApp(container) { const n = `<div class="nav-item" onclick="switchIntegratedPage('douban', 'home')"><i class="fas fa-home"></i><span>首页</span></div><div class="nav-item" onclick="switchIntegratedPage('douban', 'hot')"><i class="fas fa-fire"></i><span>热搜</span></div><div class="nav-item" onclick="switchIntegratedPage('douban', 'me')"><i class="fas fa-user"></i><span>我</span></div>`; const p = { home: '', hot: '', me: '' }; renderIntegratedAppWithPages(container, 'douban', n, p); renderDoubanHomePage(); renderDoubanHotPage(); renderDoubanMePage(); refreshDouban(); }
+        function renderIntegratedAppWithPages(container, appId, navContent, pageContents) { let pagesHtml = ''; for (const pageId in pageContents) { pagesHtml += `<div class="app-page-content" id="integrated-${appId}-${pageId}-page">${pageContents[pageId]}</div>`; } container.innerHTML = `<div class="app-navigation-bar" style="position:relative; margin-top:0;"><div class="app-back-btn" onclick="closeModal('genericModal')"><i class="fas fa-times"></i></div><div class="app-title">${appId === 'delivery' ? '外卖' : '豆瓣'}</div></div><div class="app-content" style="padding:0; display:flex; flex-direction:column; height:100%;"><div style="flex:1; overflow-y:auto; position:relative;">${pagesHtml}</div><div class="bottom-nav" style="position:relative; padding-bottom:0;">${navContent}</div></div>`; container.querySelector('.app-page-content').classList.add('active'); container.querySelector('.nav-item').classList.add('active'); }
+        function switchIntegratedPage(appId, pageId) { const container = document.getElementById('integrated-app-view'); container.querySelectorAll('.app-page-content, .nav-item').forEach(el => el.classList.remove('active')); document.getElementById(`integrated-${appId}-${pageId}-page`).classList.add('active'); container.querySelector(`.nav-item[onclick*="'${pageId}'"]`).classList.add('active'); }
+        function renderDeliveryHomePage() { document.getElementById('integrated-delivery-home-page').innerHTML = `<div class="app-navigation-bar" style="position:relative; margin-top:0;"><div class="app-title">外卖</div><div class="app-header-icon" style="right:10px; position:absolute; background-image: url('https://tc.z.wiki/autoupload/f/_dUEGnKEJQzmc-cKlsXN5NiO_OyvX7mIgxFBfDMDErs/20251021/SsLI/970X1024/Image_1760785735059.png');" onclick="refreshDelivery()"></div></div><div class="app-content" style="padding-top:44px;"><div class="delivery-search-bar"><input type="search" placeholder="搜索商家、商品名称" oninput="searchDelivery(this.value)"></div><div class="food-list" id="delivery-food-list"></div></div>`; }
+        function renderDeliveryCartPage() { const page = document.getElementById('integrated-delivery-cart-page'); const cart = systemData.delivery.cart || []; const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0); page.innerHTML = `<div class="app-navigation-bar" style="position:relative; margin-top:0;"><div class="app-title">购物车</div></div><div class="app-content" style="padding-top:44px;">${cart.length > 0 ? cart.map(item => `<div class="food-item"><img src="https://source.unsplash.com/100x100/?food,${encodeURIComponent(item.name)}"><div class="info"><div class="name">${item.name}</div><div class="price">¥${item.price.toFixed(2)} x ${item.quantity}</div></div></div>`).join('') : '<p style="text-align:center; color:#888; padding:50px;">购物车是空的</p>'}</div>${cart.length > 0 ? `<div style="position:absolute; bottom:0; left:0; right:0; background:white; padding:10px 16px; border-top:1px solid #eee; display:flex; justify-content:space-between; align-items:center;"><span>总计: <b style="color:red; font-size:18px;">¥${total.toFixed(2)}</b></span><button class="form-btn form-btn-primary" style="flex:none; padding:10px 20px;" onclick="checkoutCart()">去结算</button></div>` : ''}`; }
+        function renderDeliveryOrdersPage() { document.getElementById('integrated-delivery-orders-page').innerHTML = `<div class="app-navigation-bar" style="position:relative; margin-top:0;"><div class="app-title">订单</div></div><div class="order-list" id="delivery-order-list" style="padding-top:44px;"></div>`; renderDeliveryOrders(); }
+        function renderDeliveryMePage() { const profile = systemData.delivery.profile; document.getElementById('integrated-delivery-me-page').innerHTML = `<div class="app-navigation-bar" style="position:relative; margin-top:0;"><div class="app-title">我</div></div><div class="app-content" style="padding-top:44px;"><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden; background:white; display:flex; align-items:center; padding:20px; gap:15px;"><img src="${profile.avatar}" class="profile-avatar" style="width: 80px; height: 80px;" onclick="document.getElementById('delivery-avatar-input').click()"><input type="file" id="delivery-avatar-input" class="file-input" accept="image/*" onchange="handleFileUpload(this.files[0], url => { systemData.delivery.profile.avatar = url; saveSystemData(); renderDeliveryMePage(); })"><span style="font-size: 20px; font-weight: bold;">${profile.name}</span></div><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden;"><div class="menu-item" onclick="editProfile('delivery', 'name')"><span>昵称</span><div class="menu-item-right"><span>${profile.name}</span></div></div></div><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden;"><div class="menu-item" onclick="renderAddressListPage()"><span><i class="menu-icon fas fa-map-marker-alt"></i>我的地址</span><div class="menu-item-right"></div></div></div></div>`; }
+        function renderAddressListPage() { const addresses = systemData.delivery.profile.addresses || []; const content = `<div class="app-navigation-bar" style="position:relative; margin-top:0;"><div class="app-back-btn" onclick="renderDeliveryMePage()"><i class="fas fa-chevron-left"></i></div><div class="app-title">我的地址</div></div><div class="app-content" style="padding-top:44px;"><div style="margin:20px 16px; border-radius:10px; overflow:hidden; background:white;">${addresses.map(a => `<div class="menu-item" onclick="renderAddressEditPage(${a.id})"><div><p style="margin:0; font-weight:bold;">${a.recipient} ${a.phone}</p><p style="margin:0; font-size:14px; color:#888;">${a.address}</p></div><div class="menu-item-right"></div></div>`).join('') || '<p style="text-align:center; padding:20px; color:#888;">暂无地址</p>'}</div><div style="padding:16px;"><button class="form-btn form-btn-primary" onclick="renderAddressEditPage()">新增地址</button></div></div>`; document.getElementById('integrated-delivery-me-page').innerHTML = content; }
+        function renderAddressEditPage(addressId = null) { const isNew = addressId === null; const address = isNew ? {id: Date.now(), recipient:'', phone:'', address:''} : systemData.delivery.profile.addresses.find(a => a.id === addressId); if (!address) return; const content = `<div class="app-navigation-bar" style="position:relative; margin-top:0;"><div class="app-back-btn" onclick="renderAddressListPage()"><i class="fas fa-chevron-left"></i></div><div class="app-title">${isNew ? '新增' : '编辑'}地址</div></div><div class="app-content" style="padding-top:44px;"><div style="margin:20px 16px; border-radius:10px; overflow:hidden; background:white;"><div class="form-group"><label>收货人</label><input type="text" id="address-recipient" value="${address.recipient}"></div><div class="form-group"><label>手机号</label><input type="tel" id="address-phone" value="${address.phone}"></div><div class="form-group"><label>详细地址</label><textarea id="address-detail">${address.address}</textarea></div></div><div class="form-actions"><button class="form-btn form-btn-primary" onclick="saveAddress(${address.id}, ${isNew})">保存</button>${!isNew ? `<button class="form-btn form-btn-secondary" onclick="deleteAddress(${address.id})">删除</button>` : ''}</div></div>`; document.getElementById('integrated-delivery-me-page').innerHTML = content; }
+        function saveAddress(id, isNew) { const recipient = document.getElementById('address-recipient').value; const phone = document.getElementById('address-phone').value; const detail = document.getElementById('address-detail').value; if (!recipient || !phone || !detail) { alert('请填写完整信息'); return; } if (isNew) { if(!systemData.delivery.profile.addresses) systemData.delivery.profile.addresses = []; systemData.delivery.profile.addresses.push({ id, recipient, phone, address: detail }); } else { const index = systemData.delivery.profile.addresses.findIndex(a => a.id === id); systemData.delivery.profile.addresses[index] = { id, recipient, phone, address: detail }; } saveSystemData(); renderAddressListPage(); }
+        function deleteAddress(id) { if (!confirm('确定删除此地址吗？')) return; systemData.delivery.profile.addresses = systemData.delivery.profile.addresses.filter(a => a.id !== id); saveSystemData(); renderAddressListPage(); }
+        async function refreshDelivery() { const fl = document.getElementById('delivery-food-list'); if(!fl) return; fl.innerHTML = '<p style="text-align:center; color:#888; padding:50px;">商品加载中...</p>'; try { const prompt = "请严格按照'商品名,价格;商品名,价格;...'的格式生成35个外卖商品，例如：'多汁牛肉汉堡,25;经典意式肉酱面,38'。不要添加任何多余的文字或解释。"; const itemsStr = await callAI(prompt); const items = itemsStr.split(';').map(item => { const [name, price] = item.split(','); return name && price ? { name: name.trim(), price: parseFloat(price.trim()) } : null; }).filter(Boolean); systemData.delivery.cachedItems = items; renderDeliveryItems(items); } catch(e) { fl.innerHTML = `<p class="status-message error">商品加载失败: ${e.message}</p>`; } }
+        function searchDelivery(query) { const lowerQuery = query.toLowerCase(); const filteredItems = systemData.delivery.cachedItems.filter(item => item.name.toLowerCase().includes(lowerQuery)); renderDeliveryItems(filteredItems); }
+        function renderDeliveryItems(items) { const fl = document.getElementById('delivery-food-list'); if(!fl) return; fl.innerHTML = items.map(item => `<div class="food-item"><img src="https://source.unsplash.com/100x100/?food,${encodeURIComponent(item.name)}" alt="${item.name}"><div class="info"><div class="name">${item.name}</div><div class="price">¥${item.price.toFixed(2)}</div><button class="add-btn" onclick="addToCart('${item.name}', ${item.price})">+</button></div></div>`).join('') || '<p style="text-align:center; color:#888; padding:50px;">未找到相关商品</p>'; }
+        function renderDeliveryOrders() { const ol = document.getElementById('delivery-order-list'); if(!ol) return; ol.innerHTML = systemData.delivery.orders.length === 0 ? '<p style="text-align:center; color:#888; padding-top:50px;">暂无订单</p>' : systemData.delivery.orders.map(o => `<div class="order-item"><div class="header"><span>订单#${o.id}</span><span>${o.status}</span></div><div class="body">${o.items.map(i=>`<div>${i.name} x${i.quantity}</div>`).join('')}</div><div class="footer"><span>总计: ¥${o.total.toFixed(2)}</span></div>${o.status === '已完成' ? `<div class="actions"><div class="rating-stars" id="rating-${o.id}" onclick="rateOrder(${o.id}, event)">${[1,2,3,4,5].map(s => `<i class="fa-star ${o.rating >= s ? 'fas selected' : 'far'}"></i>`).join('')}</div><button onclick="reviewOrder(${o.id})">评价</button></div><p>${o.review || ''}</p>` : ''}</div>`).join(''); }
+        function addToCart(name, price) { const cart = systemData.delivery.cart || []; const existingItem = cart.find(item => item.name === name); if (existingItem) { existingItem.quantity++; } else { cart.push({ name, price, quantity: 1 }); } systemData.delivery.cart = cart; saveSystemData(); alert(`${name} 已加入购物车`); renderDeliveryCartPage(); }
+        function checkoutCart() { const cart = systemData.delivery.cart; if (cart.length === 0) return; const orderId = Date.now(); const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0); const newOrder = { id: orderId, status: '已下单', items: [...cart], total, rating: 0, review: '' }; systemData.delivery.orders.unshift(newOrder); systemData.delivery.cart = []; saveSystemData(); triggerNotification({name: '外卖', icon: 'https://tc.z.wiki/autoupload/f/_dUEGnKEJQzmc-cKlsXN5NiO_OyvX7mIgxFBfDMDErs/20251025/h86b/640X594/Image_1761364260149.png'}, `您的订单 #${orderId} 已下单`); switchIntegratedPage('delivery', 'orders'); renderDeliveryOrders(); renderDeliveryCartPage(); setTimeout(() => { const order = systemData.delivery.orders.find(o => o.id === orderId); if (order) { order.status = '已完成'; saveSystemData(); renderDeliveryOrders(); triggerNotification({name: '外卖', icon: 'https://tc.z.wiki/autoupload/f/_dUEGnKEJQzmc-cKlsXN5NiO_OyvX7mIgxFBfDMDErs/20251025/h86b/640X594/Image_1761364260149.png'}, `订单 #${orderId} 已送达`); } }, 5000); }
+        function rateOrder(orderId, event) { const order = systemData.delivery.orders.find(o => o.id === orderId); if (!order) return; const stars = Array.from(event.currentTarget.children); const clickedIndex = stars.indexOf(event.target); if (clickedIndex > -1) { order.rating = clickedIndex + 1; saveSystemData(); renderDeliveryOrders(); } }
+        function reviewOrder(orderId) { const order = systemData.delivery.orders.find(o => o.id === orderId); if (!order) return; const review = prompt('请输入您的评价：', order.review); if (review !== null) { order.review = review; saveSystemData(); renderDeliveryOrders(); } }
+        function renderDoubanHomePage() { document.getElementById('integrated-douban-home-page').innerHTML = `<div class="app-navigation-bar" style="position:relative; margin-top:0;"><div class="app-title">豆瓣</div><div class="app-header-icon" style="right:10px; position:absolute; background-image: url('https://tc.z.wiki/autoupload/f/_dUEGnKEJQzmc-cKlsXN5NiO_OyvX7mIgxFBfDMDErs/20251021/SsLI/970X1024/Image_1760785735059.png');" onclick="refreshDouban()"></div></div><div id="douban-posts-list" class="app-content" style="padding-top:44px; padding-bottom:0;">加载中...</div>`; }
+        function renderDoubanHotPage() { document.getElementById('integrated-douban-hot-page').innerHTML = `<div class="app-navigation-bar" style="position:relative; margin-top:0;"><div class="app-title">热搜</div></div><div class="app-content" style="padding-top:44px;"><p style="text-align:center; color:#888; padding:50px;">热搜功能开发中...</p></div>`; }
+        function renderDoubanMePage() { const profile = systemData.douban.profile; document.getElementById('integrated-douban-me-page').innerHTML = `<div class="app-navigation-bar" style="position:relative; margin-top:0;"><div class="app-title">我</div></div><div class="app-content" style="padding-top:44px;"><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden; background:white; display:flex; align-items:center; padding:20px; gap:15px;"><img src="${profile.avatar}" class="profile-avatar" style="width: 80px; height: 80px;" onclick="document.getElementById('douban-avatar-input').click()"><input type="file" id="douban-avatar-input" class="file-input" accept="image/*" onchange="handleFileUpload(this.files[0], url => { systemData.douban.profile.avatar = url; saveSystemData(); renderDoubanMePage(); })"><span style="font-size: 20px; font-weight: bold;">${profile.name}</span></div><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden;"><div class="menu-item" onclick="editProfile('douban', 'name')"><span>昵称</span><div class="menu-item-right"><span>${profile.name}</span></div></div></div><div style="margin: 20px 16px; border-radius: 10px; overflow:hidden;"><div class="menu-item" onclick="renderDoubanSettingsPage()"><span><i class="menu-icon fas fa-cog"></i>设置</span><div class="menu-item-right"></div></div></div></div>`; }
+        function renderDoubanSettingsPage() { const chars = systemData.chat.contacts; const linkedIds = systemData.douban.settings.linkedCharIds || []; let charOptions = '<h3 style="padding: 10px 16px; margin:0; color:var(--qq-blue);">关联聊天角色</h3><p style="padding: 0 16px 10px; margin:0; color:#888; font-size:14px;">关联后，首页将刷新出该角色的动态</p>'; if (chars.length > 0) { charOptions += chars.map(c => `<div class="menu-item"><label style="display: flex; align-items: center; width: 100%;"><input type="checkbox" name="linkedChar" value="${c.id}" ${linkedIds.includes(c.id) ? 'checked' : ''} onchange="toggleDoubanLinkedChar('${c.id}')"> <img src="${c.avatar}" style="width:30px; height:30px; border-radius:50%; margin:0 10px;"> ${c.name}</label></div>`).join(''); } else { charOptions += '<p style="text-align:center; padding:20px; color:#888;">聊天APP中暂无角色</p>'; } const content = `<div class="app-navigation-bar" style="position:relative; margin-top:0;"><div class="app-back-btn" onclick="renderDoubanMePage()"><i class="fas fa-chevron-left"></i></div><div class="app-title">豆瓣设置</div></div><div class="app-content" style="padding-top:44px;"><div style="margin:20px 16px; border-radius:10px; overflow:hidden;">${charOptions}</div></div>`; document.getElementById('integrated-douban-me-page').innerHTML = content; }
+        function toggleDoubanLinkedChar(charId) { const linkedIds = systemData.douban.settings.linkedCharIds || []; const id = parseInt(charId); const index = linkedIds.indexOf(id); if (index > -1) { linkedIds.splice(index, 1); } else { linkedIds.push(id); } systemData.douban.settings.linkedCharIds = linkedIds; saveSystemData(); }
+        async function refreshDouban() { const listEl = document.getElementById('douban-posts-list'); if(!listEl) return; listEl.innerHTML = '<p style="text-align:center; color:#888; padding:50px;">动态刷新中...</p>'; try { const linkedIds = systemData.douban.settings.linkedCharIds || []; let charInfo = ''; if (linkedIds.length > 0) { const randomCharId = linkedIds[Math.floor(Math.random() * linkedIds.length)]; const linkedChar = systemData.chat.contacts.find(c => c.id == randomCharId); if (linkedChar) { charInfo = `\n\n其中一条动态必须由你扮演的以下角色发布：\n姓名：${linkedChar.name}\n设定：${linkedChar.persona}`; } } const prompt = `请模拟一个社交平台信息流。${charInfo}\n请生成30条动态，另外的动态由随机NPC发布。请严格以JSON数组格式返回，不要包含任何其他说明文字。格式: [{"author":{"name":"作者名", "avatar":"https://source.unsplash.com/40x40/?portrait,person,${Math.random()}"}, "content":"动态内容"}, ... ]`; const response = await callAI(prompt); const newPosts = JSON.parse(response); newPosts.forEach(p => { p.id = Date.now() + Math.random(); p.likes = Math.floor(Math.random() * 100); p.comments = []; p.shares = Math.floor(Math.random() * 20); p.timestamp = new Date().toISOString(); }); systemData.douban.posts = newPosts; saveSystemData(); renderDoubanPosts(); } catch (e) { listEl.innerHTML = `<p class="status-message error">动态加载失败: ${e.message}</p>`; } }
+        function renderDoubanPosts() { const listEl = document.getElementById('douban-posts-list'); if(!listEl) return; listEl.innerHTML = systemData.douban.posts.map(p => `<div class="post-card" onclick="openDoubanPostDetail('${p.id}')"><div class="post-header"><img src="${p.author.avatar}" class="post-avatar"><span class="post-author">${p.author.name}</span></div><div class="post-content">${p.content}</div><div class="post-actions"><span><i class="far fa-thumbs-up"></i> ${p.likes}</span><span><i class="far fa-comment"></i> ${p.comments.length}</span><span><i class="fas fa-retweet"></i> ${p.shares}</span><span><i class="far fa-star"></i> 收藏</span></div></div>`).join(''); }
+        function openDoubanPostDetail(postId) { const post = systemData.douban.posts.find(p => p.id == postId); if (!post) return; const content = `<div class="app-navigation-bar" style="position:relative; margin-top:0;"><div class="app-back-btn" onclick="renderDoubanHomePage()"><i class="fas fa-chevron-left"></i></div><div class="app-title">动态详情</div><div class="app-header-icon" style="right:10px; position:absolute; background-image: url('https://tc.z.wiki/autoupload/f/_dUEGnKEJQzmc-cKlsXN5NiO_OyvX7mIgxFBfDMDErs/20251021/SsLI/970X1024/Image_1760785735059.png');" onclick="refreshDoubanComments('${postId}')"></div></div><div class="app-content" style="padding-bottom:70px; padding-top:44px;"><div class="post-card" style="border-bottom:none; cursor:default;"><div class="post-header"><img src="${post.author.avatar}" class="post-avatar"><span class="post-author">${post.author.name}</span></div><div class="post-content">${post.content}</div><div class="post-actions"><span><i class="far fa-thumbs-up"></i> ${post.likes}</span><span><i class="far fa-comment"></i> ${post.comments.length}</span><span><i class="fas fa-retweet"></i> ${post.shares}</span><span><i class="far fa-star"></i> 收藏</span></div></div><h4 style="padding:15px 16px 0; border-top: 8px solid var(--qq-bg); margin:0;">评论</h4><div id="douban-comments-list" style="background:white; padding: 0 16px;">${renderDoubanComments(post)}</div></div><div class="comment-input-area" style="position:absolute; bottom:0; left:0; right:0; padding-bottom:0;"><input type="text" id="comment-input-${postId}" placeholder="发布你的评论..."><button onclick="addDoubanComment('${postId}')">发送</button></div>`; document.getElementById('integrated-douban-home-page').innerHTML = content; }
+        function renderDoubanComments(post) { return post.comments.length > 0 ? post.comments.map(c => `<div class="comment-item"><div class="comment-header"><img src="${c.author.avatar}" class="comment-avatar"><span class="comment-author">${c.author.name}</span><span class="comment-time">${new Date(c.timestamp).toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'})}</span></div><div class="comment-content">${c.content}</div></div>`).join('') : '<p style="text-align:center; color:#888; padding:20px;">暂无评论</p>'; }
+        async function refreshDoubanComments(postId) { const post = systemData.douban.posts.find(p => p.id == postId); if (!post) return; try { const prompt = `为这条动态“${post.content}”生成一条新的评论。请严格以JSON格式返回，不要包含任何其他说明文字。格式: {"author":{"name":"评论者名", "avatar":"https://source.unsplash.com/24x24/?portrait,person,${Math.random()}"}, "content":"评论内容"}`; const response = await callAI(prompt); const newComment = JSON.parse(response); newComment.timestamp = new Date().toISOString(); post.comments.push(newComment); saveSystemData(); openDoubanPostDetail(postId); } catch (e) { alert(`评论刷新失败: ${e.message}`); } }
+        function addDoubanComment(postId) { const input = document.getElementById(`comment-input-${postId}`); const content = input.value.trim(); if (!content) return; const post = systemData.douban.posts.find(p => p.id == postId); if (!post) return; const newComment = { author: { name: systemData.douban.profile.name, avatar: systemData.douban.profile.avatar }, content: content, timestamp: new Date().toISOString() }; post.comments.push(newComment); saveSystemData(); openDoubanPostDetail(postId); }
+        function editProfile(app, field) { const currentVal = systemData[app].profile[field]; const newVal = prompt(`输入新的${field==='name'?'昵称':'地址'}:`, currentVal); if(newVal !== null && newVal !== currentVal) { systemData[app].profile[field] = newVal; saveSystemData(); if(app==='delivery') renderDeliveryMePage(); else if(app==='douban') renderDoubanMePage(); } }
+
+        // --- 初始化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSystemData();
+            const appData = [
+                { id: 'chat', name: '聊天', icon: systemData.beautify.appIcons.chat, renderFunc: renderChatApp },
+                { id: 'settings', name: '设置', icon: systemData.beautify.appIcons.settings, renderFunc: renderSettingsApp },
+                { id: 'memo', name: '备忘录', icon: systemData.beautify.appIcons.memo, renderFunc: () => { /* 备忘录功能待实现 */ } },
+            ];
+            
+            document.getElementById('app-grid').innerHTML = appData.map(app => `<div class="app-icon-wrapper" onclick="openApp('${app.id}')"><div class="app-icon-image"><img id="app-icon-${app.id}" src="${app.icon}" alt="${app.name}"></div><div class="app-icon-name">${app.name}</div></div>`).join('');
+            
+            appData.forEach(app => app.renderFunc());
+            
+            updateTime(); 
+            setInterval(updateTime, 1000);
+            
+            updateBattery(); 
+            navigator.getBattery?.().then(b => { 
+                b.onlevelchange = updateBattery; 
+                b.onchargingchange = updateBattery; 
+            });
+            
+            applyBeautification();
+            updateScreenMode(systemData.settings.fullscreen);
+            
+            document.querySelector('.status-bar-right').addEventListener('click', showNotificationCenter);
+            document.querySelector('.dynamic-island').addEventListener('click', showNotificationCenter);
+        });
+
+        function applyBeautification() {
+            document.getElementById('home-screen').style.backgroundImage = `url(${systemData.beautify.desktopWallpaper})`;
+            const styleInject = document.getElementById('user-styles-injection');
+            
+            // 结合默认立体黑气泡和用户自定义CSS
+            const defaultBubbleCss = `
+                .message-bubble.sent .content,
+                .message-bubble.received .content {
+                    background-color: #000000; color: #FFFFFF; padding: 4px 6px; margin: 4px 0;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; border: none;
+                    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.5), inset 0px 1px 1px rgba(255, 255, 255, 0.1), inset 0px -1px 1px rgba(0, 0, 0, 0.3);
+                    text-shadow: 0 0 3px rgba(255, 255, 255, 0.2); animation: none;
+                    word-wrap: break-word; white-space: pre-wrap;
+                }
+                .message-bubble.received .content { border-radius: 16px 16px 16px 6px; }
+                .message-bubble.sent .content { border-radius: 16px 16px 6px 16px; }
+            `;
+            styleInject.innerHTML = defaultBubbleCss + '\n' + (systemData.beautify.chatBubbleCss || '');
+
+            if (systemData.beautify.fontUrl) {
+                const fontStyle = `@font-face { font-family: 'CustomFont'; src: url('${systemData.beautify.fontUrl}'); } body, .screen, input, textarea, button { font-family: 'CustomFont', -apple-system, sans-serif !important; }`;
+                styleInject.innerHTML += fontStyle;
+            }
+            
+            // Apply app icons
+            Object.keys(systemData.beautify.appIcons).forEach(appId => {
+                const imgEl = document.getElementById(`app-icon-${appId}`);
+                if (imgEl) imgEl.src = systemData.beautify.appIcons[appId];
+            });
+            
+            saveSystemData();
+        }
+    </script>
+</body>
+</html>
